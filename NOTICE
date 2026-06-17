@@ -1,0 +1,54 @@
+de-morph-rs
+Copyright 2026 Marc Bachmann
+
+Source code in this project is licensed under the MIT License; see
+LICENSE-MIT.
+
+This NOTICE file enumerates third-party attributions required by the
+licenses of components shipped with or built into this project.
+Verbatim third-party license texts live under LICENSES/.
+
+================================================================================
+Third-party data attributions
+================================================================================
+
+This project draws on the following third-party data sources. Each
+attribution paragraph satisfies the corresponding licence's attribution
+clause. None of these files are bundled in the published cargo crate
+(`data/` is excluded from `[package].exclude`); the attributions stand
+for any redistribution of the derivative artefacts.
+
+--- German Wiktionary ---
+
+This product includes a build pipeline that processes a snapshot of
+the German Wiktionary, available at:
+
+    https://dumps.wikimedia.org/dewiktionary/
+
+Snapshot version: 20260601 (fetched 2026-06-16)
+Licence: Creative Commons Attribution-ShareAlike 4.0 International
+         (CC BY-SA 4.0; see LICENSES/CC-BY-SA-4.0.txt)
+Attribution required: Wiktionary contributors
+Author/history reference:
+    https://de.wiktionary.org/
+
+Any lexicon, FST, table, or data artefact derived from this snapshot
+inherits CC BY-SA 4.0 and must preserve attribution to Wiktionary
+contributors. The MIT-licensed Rust source code in this repository
+contains no Wiktionary-derived text; the derivative data layer is
+shipped (when shipped) as a separately-licensed artefact.
+
+================================================================================
+Third-party Rust crate attributions
+================================================================================
+
+This crate has the following direct dependencies. Their licenses are
+permissive (Unlicense/MIT/Apache-2.0 family) and do not propagate
+restrictions to consumers of this crate.
+
+- fst — Andrew Gallant <jamslam@gmail.com>; dual-licensed Unlicense OR MIT.
+  https://github.com/BurntSushi/fst
+
+Transitive dependencies, when added, will be reviewed individually; the
+intent is that the entire dependency tree remains permissively licensed
+so that downstream consumers face no obligations beyond MIT attribution.

@@ -1,0 +1,92 @@
+[package]
+name = "de-morph-rs"
+version = "0.0.1"
+edition = "2021"
+rust-version = "1.74"
+description = "German morphological analyzer based on finite-state transducers"
+license = "MIT"
+keywords = ["german", "morphology", "nlp", "fst", "linguistics"]
+categories = ["text-processing"]
+readme = "README.md"
+
+# data/ may carry CC BY-SA derivatives of German Wiktionary, and scripts/ is
+# the build tooling. Both directories MUST stay out of the published crate so
+# cargo consumers get only MIT-licensed bytes. Verify before any release with:
+#   cargo package --list | grep -E '^(data|scripts)/'
+exclude = ["data/*", "scripts/*"]
+
+[lib]
+name = "de_morph"
+
+[features]
+default = []
+# Build-time tooling: streaming bz2/XML reader, MediaWiki template parser,
+# and the extract-* binaries. Not needed at runtime — the published crate
+# default keeps the dependency tree minimal.
+extractor = [
+    "dep:anyhow",
+    "dep:bzip2",
+    "dep:quick-xml",
+    "dep:serde",
+    "dep:serde_json",
+]
+
+[dependencies]
+fst = "0.4"
+anyhow = { version = "1", optional = true }
+bzip2 = { version = "0.4", optional = true }
+quick-xml = { version = "0.36", optional = true }
+serde = { version = "1", features = ["derive"], optional = true }
+serde_json = { version = "1", optional = true }
+
+[[bin]]
+name = "extract-nouns"
+path = "src/bin/extract-nouns.rs"
+required-features = ["extractor"]
+
+[[bin]]
+name = "extract-verbs"
+path = "src/bin/extract-verbs.rs"
+required-features = ["extractor"]
+
+[[bin]]
+name = "extract-adjectives"
+path = "src/bin/extract-adjectives.rs"
+required-features = ["extractor"]
+
+[[bin]]
+name = "extract-adverbs"
+path = "src/bin/extract-adverbs.rs"
+required-features = ["extractor"]
+
+[[bin]]
+name = "extract-particles"
+path = "src/bin/extract-particles.rs"
+required-features = ["extractor"]
+
+[[bin]]
+name = "extract-compounds"
+path = "src/bin/extract-compounds.rs"
+required-features = ["extractor"]
+
+[[bin]]
+name = "extract-abbreviations"
+path = "src/bin/extract-abbreviations.rs"
+required-features = ["extractor"]
+
+[[bin]]
+name = "extract-propn"
+path = "src/bin/extract-propn.rs"
+required-features = ["extractor"]
+
+[[bin]]
+name = "build-lexicon"
+path = "src/bin/build-lexicon.rs"
+required-features = ["extractor"]
+
+# build_fst.rs is a build-time tool: reads JSONL output from extract-nouns
+# (gated by the same feature) and uses anyhow::Context for I/O context.
+# Demo examples that only use Lexicon/Analyzer at runtime don't need this gate.
+[[example]]
+name = "build_fst"
+required-features = ["extractor"]

@@ -1,0 +1,20 @@
+target/
+**/*.rs.bk
+
+# Raw fetched data and intermediate build artifacts are regenerable from
+# the fetch scripts + sha256-pinned upstream snapshots. Processed outputs
+# (e.g. data/wiktionary/processed/nouns.jsonl) are also regenerable from
+# raw/ via the extractor binaries and would bloat the repo if committed.
+# The eventual shipped artifact (compiled FST) lives elsewhere under its
+# own provenance entry; it is not under data/.
+/data/**/raw/
+/data/**/build/
+/data/**/processed/
+
+# Editor / OS noise
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db

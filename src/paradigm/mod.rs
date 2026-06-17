@@ -1,0 +1,32 @@
+//! Rule-based paradigm generation for German nouns / verbs / adjectives.
+//!
+//! Two distinct jobs:
+//! - **Generate**: given a known lemma, gender, declension class and (where
+//!   relevant) a plural form, produce the full paradigm. This is the
+//!   "I know everything about this lemma except the inflected forms"
+//!   case. Forms are tagged [`crate::analysis::Source::Generated`].
+//! - **Guess**: given an out-of-vocabulary surface form, heuristically
+//!   propose lemma + declension hypotheses ranked by confidence. Forms
+//!   produced from these guesses are tagged
+//!   [`crate::analysis::Source::Guessed`].
+//!
+//! The two layers compose: the runtime analyzer first tries the FST
+//! lexicon; if that misses, it falls back to the guesser; the `Source`
+//! tag on each returned [`crate::analysis::Analysis`] tells the caller
+//! how much to trust the result.
+//!
+//! Module scope at v0: nouns only. Verbs and adjectives land in
+//! sibling modules as they're written.
+
+pub mod adjective;
+pub mod closed_class;
+pub mod noun;
+pub mod verb;
+
+pub use adjective::{AdjectiveAttested, generate_adjective_paradigm};
+pub use closed_class::generate_closed_class_entries;
+pub use noun::{
+    Confidence, NounClass, NounGuess, default_plural_guess, generate_noun_paradigm, guess_noun,
+    predict_dative_forms,
+};
+pub use verb::{VerbAttested, generate_verb_paradigm};
