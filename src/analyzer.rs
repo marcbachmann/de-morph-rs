@@ -197,22 +197,6 @@ impl Analyzer {
         }
     }
 
-    /// OOV path for adjective-shaped surfaces.
-    ///
-    /// Strategy: peel a small set of German adjective endings off
-    /// `surface` and treat the stem as an adjective lemma hypothesis.
-    /// Generate the full adjective paradigm and emit any cell that
-    /// matches the original surface, with case-insensitive comparison
-    /// of the first character (so sentence-initial `"Letzte"`
-    /// resolves to lemma `"letzt"` via paradigm cell `"letzte"`).
-    ///
-    /// Limitations:
-    /// - Suppletive comparatives/superlatives (gut/besser/best) are
-    ///   not recovered; the lemma must already be in the lexicon.
-    /// - Substantivised adjectives (`Der Große ging`) match by
-    ///   case-folding the surface against the predicative paradigm
-    ///   cells; the analysis still uses `UPOS::ADJ`, not `UPOS::NOUN`.
-
     /// Decompose a hyphenated compound like `Palmöl-Importe` into
     /// `(left, right) = ("Palmöl", "Importe")` and synthesise compound
     /// analyses from the right element (which carries the inflection
@@ -254,6 +238,7 @@ impl Analyzer {
     /// Returns `None` if no split works; the caller then falls through
     /// to the OOV path.
     fn analyze_hyphenated(&self, surface: &str, depth: usize) -> Option<Vec<Analysis>> {
+        use crate::analysis::PackedFeatures;
         if depth > 5 {
             return None;
         }
@@ -297,19 +282,33 @@ impl Analyzer {
                     direct
                 }
             };
-            let synthesised: Vec<Analysis> = right_hits
-                .into_iter()
-                .filter(|a| a.pos == UPOS::NOUN || a.pos == UPOS::PROPN)
-                .map(|a| Analysis {
-                    lemma: format!("{left}-{}", a.lemma),
+            // Synthesise one compound analysis per DISTINCT right hit.
+            // Dedup by (lemma, pos, packed features): every synthesised
+            // analysis is forced to Source::Generated, so two right hits
+            // that differ only in their source (e.g. one Lexicon, one
+            // Generated for the same form) would otherwise collapse to
+            // byte-identical compounds. Distinct features are preserved.
+            let mut synthesised: Vec<Analysis> = Vec::new();
+            let mut seen: HashSet<(String, u8, u32)> = HashSet::new();
+            for a in right_hits {
+                if a.pos != UPOS::NOUN && a.pos != UPOS::PROPN {
+                    continue;
+                }
+                let lemma = format!("{left}-{}", a.lemma);
+                let key = (lemma.clone(), a.pos as u8, PackedFeatures::pack(a.features).0);
+                if !seen.insert(key) {
+                    continue;
+                }
+                synthesised.push(Analysis {
+                    lemma,
                     pos: a.pos,
                     features: a.features,
                     // Synthesised, not attested as a whole: tag Generated
                     // rather than inheriting the right part's source (which
                     // would mislabel the compound as Lexicon-attested).
                     source: Source::Generated,
-                })
-                .collect();
+                });
+            }
             if !synthesised.is_empty() {
                 return Some(synthesised);
             }
@@ -317,6 +316,21 @@ impl Analyzer {
         None
     }
 
+    /// OOV path for adjective-shaped surfaces.
+    ///
+    /// Strategy: peel a small set of German adjective endings off
+    /// `surface` and treat the stem as an adjective lemma hypothesis.
+    /// Generate the full adjective paradigm and emit any cell that
+    /// matches the original surface, with case-insensitive comparison
+    /// of the first character (so sentence-initial `"Letzte"`
+    /// resolves to lemma `"letzt"` via paradigm cell `"letzte"`).
+    ///
+    /// Limitations:
+    /// - Suppletive comparatives/superlatives (gut/besser/best) are
+    ///   not recovered; the lemma must already be in the lexicon.
+    /// - Substantivised adjectives (`Der Große ging`) match by
+    ///   case-folding the surface against the predicative paradigm
+    ///   cells; the analysis still uses `UPOS::ADJ`, not `UPOS::NOUN`.
     fn guess_adj_paradigm_cells(&self, surface: &str) -> Vec<Analysis> {
         let mut out = Vec::new();
         let mut seen: HashSet<(String, u8, u32)> = HashSet::new();
@@ -971,6 +985,132 @@ mod tests {
         let hits = analyzer.analyze("schwarz-weiß");
         // Should be empty: schwarz is ADJ, not NOUN, so hyphen-path declines.
         assert!(hits.is_empty(), "expected no hyphen-split for adj-adj, got {hits:?}");
+    }
+
+    /// Build an analyzer over `entries` (all tagged `Source::Lexicon`)
+    /// with the OOV fallback disabled, so tests isolate the hyphen path.
+    fn lexicon_analyzer(entries: &[(&str, &str, UPOS, Features)]) -> Analyzer {
+        let mut b = LexiconBuilder::new();
+        for &(surface, lemma, pos, features) in entries {
+            b.add(surface, lemma, pos, features, Source::Lexicon).unwrap();
+        }
+        let mut fst = Vec::new();
+        let mut side = Vec::new();
+        b.finish(&mut fst, &mut side).unwrap();
+        Analyzer::from_lexicon(Lexicon::from_bytes(fst, side).unwrap()).with_oov_fallback(false)
+    }
+
+    #[test]
+    fn analyzer_hyphen_accepts_propn_left() {
+        // Volkswagen-Konzern: PROPN left + NOUN right. The hyphen path
+        // accepts a proper-noun left element (org-style compounds).
+        let analyzer = lexicon_analyzer(&[
+            ("Volkswagen", "Volkswagen", UPOS::PROPN, Features::empty()),
+            (
+                "Konzern",
+                "Konzern",
+                UPOS::NOUN,
+                Features::noun_form(Gender::Masc, Number::Sg, Case::Nom),
+            ),
+        ]);
+        let hits = analyzer.analyze("Volkswagen-Konzern");
+        let h = hits
+            .iter()
+            .find(|a| a.lemma == "Volkswagen-Konzern")
+            .unwrap_or_else(|| panic!("expected PROPN-left compound, got {hits:?}"));
+        assert_eq!(h.pos, UPOS::NOUN);
+        assert_eq!(h.source, Source::Generated);
+    }
+
+    #[test]
+    fn analyzer_hyphen_rejects_empty_segments() {
+        // Degenerate hyphenation must not panic or mis-split. Leading,
+        // trailing, and doubled hyphens each leave an empty segment that
+        // the split loop skips, so none produce a compound. (OOV off.)
+        let analyzer = lexicon_analyzer(&[
+            ("Volkswagen", "Volkswagen", UPOS::PROPN, Features::empty()),
+            (
+                "Konzern",
+                "Konzern",
+                UPOS::NOUN,
+                Features::noun_form(Gender::Masc, Number::Sg, Case::Nom),
+            ),
+        ]);
+        for surface in ["-Konzern", "Volkswagen-", "Volkswagen--Konzern"] {
+            assert!(
+                analyzer.analyze(surface).is_empty(),
+                "expected no compound for degenerate {surface:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn analyzer_hyphen_dedupes_identical_right_analyses() {
+        // The right form "Teile" is attested twice with the SAME
+        // (lemma, pos, features) but different Source (Lexicon vs
+        // Generated). Because the compound forces Source::Generated,
+        // both would collapse to identical analyses — dedup keeps one.
+        let mut b = LexiconBuilder::new();
+        b.add(
+            "Auto",
+            "Auto",
+            UPOS::NOUN,
+            Features::noun_form(Gender::Neut, Number::Sg, Case::Nom),
+            Source::Lexicon,
+        )
+        .unwrap();
+        let pl = Features::noun_form(Gender::Masc, Number::Pl, Case::Nom);
+        b.add("Teile", "Teil", UPOS::NOUN, pl, Source::Lexicon).unwrap();
+        b.add("Teile", "Teil", UPOS::NOUN, pl, Source::Generated).unwrap();
+        let mut fst = Vec::new();
+        let mut side = Vec::new();
+        b.finish(&mut fst, &mut side).unwrap();
+        let analyzer = Analyzer::from_lexicon(Lexicon::from_bytes(fst, side).unwrap())
+            .with_oov_fallback(false);
+        // Premise: the right form really does carry two distinct records.
+        assert_eq!(analyzer.analyze("Teile").len(), 2);
+        let hits = analyzer.analyze("Auto-Teile");
+        let n = hits.iter().filter(|a| a.lemma == "Auto-Teil").count();
+        assert_eq!(n, 1, "expected one deduped compound, got {hits:?}");
+    }
+
+    #[test]
+    fn analyzer_hyphen_preserves_distinct_right_analyses() {
+        // When the right form has genuinely distinct analyses (Nom vs
+        // Acc), each yields its own compound — dedup must NOT merge them.
+        let analyzer = lexicon_analyzer(&[
+            (
+                "Auto",
+                "Auto",
+                UPOS::NOUN,
+                Features::noun_form(Gender::Neut, Number::Sg, Case::Nom),
+            ),
+            (
+                "Bahn",
+                "Bahn",
+                UPOS::NOUN,
+                Features::noun_form(Gender::Fem, Number::Sg, Case::Nom),
+            ),
+            (
+                "Bahn",
+                "Bahn",
+                UPOS::NOUN,
+                Features::noun_form(Gender::Fem, Number::Sg, Case::Acc),
+            ),
+        ]);
+        let hits = analyzer.analyze("Auto-Bahn");
+        let compounds: Vec<_> = hits.iter().filter(|a| a.lemma == "Auto-Bahn").collect();
+        assert_eq!(compounds.len(), 2, "expected Nom+Acc compounds, got {hits:?}");
+        assert!(compounds.iter().any(|a| a.features.case == Some(Case::Nom)));
+        assert!(compounds.iter().any(|a| a.features.case == Some(Case::Acc)));
+    }
+
+    #[test]
+    fn analyzer_hyphen_no_lexicon_yields_nothing() {
+        // No lexicon loaded: the lexicon block is skipped entirely, so a
+        // hyphenated surface yields nothing without panicking (OOV off).
+        let analyzer = Analyzer::empty().with_oov_fallback(false);
+        assert!(analyzer.analyze("Palmöl-Importe").is_empty());
     }
 
     #[test]
