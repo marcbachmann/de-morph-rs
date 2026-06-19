@@ -211,6 +211,14 @@ fn elide_unstressed_medial_e(stem: &str) -> Option<String> {
     if n < 3 {
         return None;
     }
+    // Final-stressed -el (the "fidel" family: fidel, bumsfidel,
+    // kreuzfidel, quietschfidel) keeps its -e- (fidele, not fidle).
+    // There's no general spelling signal for -el stress, but this is the
+    // only common stressed-el class; any others that carry a Komparativ
+    // are caught by the Komparativ check in positive_attributive_stem.
+    if stem.ends_with("fidel") {
+        return None;
+    }
     let last = chars[n - 1];
     if chars[n - 2] != 'e' {
         return None;
@@ -764,6 +772,35 @@ mod tests {
         assert_eq!(pos(Case::Nom, Number::Sg, Gender::Masc), vec!["fideler"]);
         let surfaces: Vec<&str> = cells.iter().map(|(s, _)| s.as_str()).collect();
         assert!(!surfaces.contains(&"fidle"), "wrongly elided fidel→fidle");
+    }
+
+    #[test]
+    fn stressed_fidel_family_not_elided_without_komparativ() {
+        // "bumsfidel"/"kreuzfidel"/"quietschfidel" are compounds of the
+        // final-stressed "fidel"; they keep the -e- (bumsfidele), but
+        // have no Komparativ in Wiktionary to attest it. The fidel-family
+        // guard handles them on shape alone.
+        for lemma in ["bumsfidel", "kreuzfidel", "quietschfidel"] {
+            let inputs = AdjectiveAttested {
+                lemma,
+                komparativ: None,
+                superlativ: None,
+            };
+            let cells = generate_adjective_paradigm(&inputs);
+            let fem_nom = find(
+                &cells,
+                Degree::Pos,
+                Some(Declension::Strong),
+                Some(Case::Nom),
+                Some(Number::Sg),
+                Some(Gender::Fem),
+            );
+            assert_eq!(fem_nom, vec![format!("{lemma}e")], "{lemma}");
+            assert!(
+                !cells.iter().any(|(s, _)| s == &lemma.replace("fidel", "fidl")),
+                "wrongly elided {lemma}"
+            );
+        }
     }
 
     #[test]
