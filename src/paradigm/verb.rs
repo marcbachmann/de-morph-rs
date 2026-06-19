@@ -426,7 +426,12 @@ fn past_paradigm(past_1sg: &str) -> Vec<(Person, Number, String, bool)> {
     let ends_in_e = stem.ends_with('e');
     let e_link = needs_e_link(stem) && !ends_in_e;
 
-    let du = if e_link {
+    // The 2Sg -st ending needs an epenthetic -e- after BOTH t/d stems
+    // (du rittest) AND sibilant stems s/ß/z/x/sch (du aßest, du lasest),
+    // since *aßst / *lasst are unpronounceable. The 2Pl -t ending only
+    // needs it after t/d (du wartetest → ihr wartetet; but ihr aßt, no
+    // epenthesis), so `ihr` below keeps using `e_link`.
+    let du = if !ends_in_e && (needs_e_link(stem) || ends_in_sibilant(stem)) {
         format!("{stem}est")
     } else {
         format!("{stem}st")
@@ -478,6 +483,18 @@ fn konj_i_paradigm(stem: &str) -> Vec<(Person, Number, String)> {
 fn needs_e_link(stem: &str) -> bool {
     let last = stem.chars().last().unwrap_or(' ');
     matches!(last, 't' | 'd')
+}
+
+/// Whether the stem ends in a sibilant (`s`, `ß`, `z`, `x`, or `sch`).
+/// Such stems need an epenthetic -e- before a 2Sg `-st` ending
+/// (`aß` → `aßest`, `las` → `lasest`), because the bare `-st` would
+/// fuse the sibilants unpronounceably (`*aßst`).
+fn ends_in_sibilant(stem: &str) -> bool {
+    stem.ends_with('s')
+        || stem.ends_with('ß')
+        || stem.ends_with('z')
+        || stem.ends_with('x')
+        || stem.ends_with("sch")
 }
 
 #[cfg(test)]
@@ -688,6 +705,41 @@ mod tests {
         assert_eq!(past(Person::P1, Number::Pl), vec![("sangen".into(), Source::Generated)]);
         assert_eq!(past(Person::P2, Number::Pl), vec![("sangt".into(), Source::Generated)]);
         assert_eq!(past(Person::P3, Number::Pl), vec![("sangen".into(), Source::Generated)]);
+    }
+
+    #[test]
+    fn strong_verb_past_2sg_sibilant_stem_gets_epenthetic_e() {
+        // "essen": ich aß. The 2Sg past needs an epenthetic -e- before
+        // -st because the stem ends in a sibilant: "du aßest" (not the
+        // unpronounceable "aßst"). The 2Pl "ihr aßt" takes NO epenthesis.
+        let inputs = VerbAttested {
+            infinitive: "essen",
+            present_1sg: Some("esse"),
+            present_2sg: Some("isst"),
+            present_3sg: Some("isst"),
+            past_1sg: Some("aß"),
+            konj_ii_1sg: Some("äße"),
+            imperativ_sg: Some("iss"),
+            imperativ_pl: Some("esst"),
+            partizip_perf: Some("gegessen"),
+        };
+        let cells = generate_verb_paradigm(&inputs);
+        let past = |p, n| {
+            find(
+                &cells,
+                Some(p),
+                Some(n),
+                Some(Tense::Past),
+                Some(Mood::Ind),
+                Some(VerbForm::Fin),
+            )
+        };
+        assert_eq!(past(Person::P2, Number::Sg), vec![("aßest".into(), Source::Generated)]);
+        assert_eq!(past(Person::P2, Number::Pl), vec![("aßt".into(), Source::Generated)]);
+        assert!(
+            !cells.iter().any(|(s, _)| s == "aßst"),
+            "over-generated unpronounceable 'aßst'"
+        );
     }
 
     #[test]

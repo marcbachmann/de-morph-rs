@@ -68,14 +68,19 @@ pub fn generate_adjective_paradigm(inputs: &AdjectiveAttested) -> Vec<AdjectiveC
         push_predicative(&mut out, s, lemma, Degree::Sup, Source::Lexicon);
     }
 
-    // Attributive forms — apply 72 endings to each degree's stem.
-    apply_all_endings(&mut out, lemma, lemma, Degree::Pos);
+    // Attributive forms — apply 72 endings to each degree's resolved
+    // inflection stem. The positive stem's -el/-er elision is decided
+    // with the Komparativ as evidence (see positive_attributive_stem);
+    // the comparative/superlative stems come straight from attested
+    // forms, so only final-e schwa-deletion applies to them.
+    let pos_stem = positive_attributive_stem(lemma, inputs.komparativ);
+    apply_all_endings(&mut out, &pos_stem, lemma, Degree::Pos);
     if let Some(c) = inputs.komparativ {
-        apply_all_endings(&mut out, c, lemma, Degree::Cmp);
+        apply_all_endings(&mut out, schwa_delete(c), lemma, Degree::Cmp);
     }
     if let Some(s) = inputs.superlativ {
         let stem = superlative_stem(s);
-        apply_all_endings(&mut out, &stem, lemma, Degree::Sup);
+        apply_all_endings(&mut out, schwa_delete(&stem), lemma, Degree::Sup);
     }
 
     out
@@ -105,17 +110,14 @@ fn push_predicative(
 /// For one degree's stem, emit all 72 attributive cells (3 declensions
 /// × 4 cases × 2 numbers × 3 genders).
 ///
-/// Applies schwa-deletion to the stem before suffixing: an unstressed
-/// final `-e` on the stem (`leise`, `müde`, `böse`) is dropped so the
-/// resulting forms don't double the vowel (`leise` + Fem-Nom `-e` →
-/// `leise`, not `leisee`).
+/// `stem` is the already-resolved inflection stem for this degree — the
+/// caller has applied schwa-deletion / -el/-er elision; this function
+/// just concatenates endings.
 fn apply_all_endings(out: &mut Vec<AdjectiveCell>, stem: &str, lemma: &str, degree: Degree) {
     use Case::*;
     use Declension::*;
     use Gender::*;
     use Number::*;
-
-    let effective_stem = inflection_stem(stem, degree);
 
     let declensions = [Strong, Weak, Mixed];
     let cases = [Nom, Gen, Dat, Acc];
@@ -127,7 +129,7 @@ fn apply_all_endings(out: &mut Vec<AdjectiveCell>, stem: &str, lemma: &str, degr
             for &number in &numbers {
                 for &gender in &genders {
                     let ending = adjective_ending(declension, case, number, gender);
-                    let surface = format!("{effective_stem}{ending}");
+                    let surface = format!("{stem}{ending}");
                     let analysis = Analysis::with_source(
                         lemma,
                         UPOS::ADJ,
@@ -148,25 +150,33 @@ fn apply_all_endings(out: &mut Vec<AdjectiveCell>, stem: &str, lemma: &str, degr
     }
 }
 
-/// Compute the stem that inflectional endings are appended to, given
-/// the degree being generated.
+/// Resolve the positive-degree attributive stem, deciding `-el` /
+/// vowel+`-er` elision with the Komparativ as evidence.
 ///
-/// Two distinct elisions apply, both before any vowel-initial ending:
-/// - **Positive degree only**: the unstressed medial `-e-` of `-el`
-///   and vowel+`-er` stems is dropped (`dunkel` → `dunkl` → `dunkle`,
-///   `teuer` → `teur` → `teure`). This is gated to the positive degree
-///   because the comparative carries its own `-er` morpheme
-///   (`dunkler` must inflect to `dunklere`, not `dunkle`) and the
-///   superlative keeps its `-e-` (`dunkelste`).
-/// - **All degrees**: final unstressed `-e` is dropped to avoid
-///   doubling (`leise` → `leis` → `leise`), via [`schwa_delete`].
-fn inflection_stem(stem: &str, degree: Degree) -> String {
-    if degree == Degree::Pos {
-        if let Some(elided) = elide_unstressed_medial_e(stem) {
-            return elided;
+/// [`elide_unstressed_medial_e`] flags stems whose *shape* could elide
+/// (`dunkel`, `teuer`, `fidel`). Whether the medial `-e-` actually drops
+/// depends on stress, which spelling doesn't reveal — but the attested
+/// Komparativ does: `dunkel`→`dunkler` (elided) vs `fidel`→`fideler`
+/// (kept). So when the Komparativ keeps the `-e-` (equals `{lemma}er`),
+/// the stem is stressed and we do NOT elide; otherwise (elided,
+/// umlauted, or no Komparativ at all) we trust the spelling heuristic
+/// and elide.
+///
+/// Known residual: stressed `-el` adjectives with no Komparativ to
+/// consult (`bumsfidel`, `kreuzfidel`) still elide wrongly. Rare enough
+/// to leave for a curated exception list if it ever matters.
+///
+/// Stems with no elidable shape get plain final-`e` schwa-deletion
+/// (`leise` → `leis`), applied to every degree by the callers.
+fn positive_attributive_stem(lemma: &str, komparativ: Option<&str>) -> String {
+    if let Some(elided) = elide_unstressed_medial_e(lemma) {
+        let komparativ_keeps_e = komparativ.is_some_and(|k| k == format!("{lemma}er"));
+        if komparativ_keeps_e {
+            return lemma.to_string();
         }
+        return elided;
     }
-    schwa_delete(stem).to_string()
+    schwa_delete(lemma).to_string()
 }
 
 /// Drop the unstressed medial `-e-` of an `-el` / vowel+`-er` stem.
@@ -627,6 +637,34 @@ mod tests {
         for bad in ["teuere", "teuerer", "teuerem"] {
             assert!(!surfaces.contains(&bad), "over-generated invalid {bad:?}");
         }
+    }
+
+    #[test]
+    fn stressed_el_with_unelided_komparativ_is_not_elided() {
+        // "fidel" is stressed on the -el, so it does NOT elide: fidele /
+        // fideler. Wiktionary's Komparativ ("fideler", not "fidler")
+        // attests this, and we trust it over the spelling heuristic
+        // (which, on shape alone, would wrongly elide to "fidle").
+        let inputs = AdjectiveAttested {
+            lemma: "fidel",
+            komparativ: Some("fideler"),
+            superlativ: Some("fidelsten"),
+        };
+        let cells = generate_adjective_paradigm(&inputs);
+        let pos = |c, n, g| {
+            find(
+                &cells,
+                Degree::Pos,
+                Some(Declension::Strong),
+                Some(c),
+                Some(n),
+                Some(g),
+            )
+        };
+        assert_eq!(pos(Case::Nom, Number::Sg, Gender::Fem), vec!["fidele"]);
+        assert_eq!(pos(Case::Nom, Number::Sg, Gender::Masc), vec!["fideler"]);
+        let surfaces: Vec<&str> = cells.iter().map(|(s, _)| s.as_str()).collect();
+        assert!(!surfaces.contains(&"fidle"), "wrongly elided fidel→fidle");
     }
 
     #[test]
