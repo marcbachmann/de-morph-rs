@@ -19,6 +19,7 @@ use anyhow::Context;
 use anyhow::Result;
 use serde::Deserialize;
 
+use de_morph::analysis::Aux;
 use de_morph::analysis::Case;
 use de_morph::analysis::Degree;
 use de_morph::analysis::Features;
@@ -58,6 +59,8 @@ struct Record {
     degree: Option<String>,
     #[serde(default)]
     pron_type: Option<String>,
+    #[serde(default)]
+    aux: Option<String>,
     #[serde(default)]
     source: Option<String>,
 }
@@ -290,6 +293,14 @@ fn build_features(rec: &Record, counters: &mut Counters) -> Features {
             "Pos" => f.degree = Some(Degree::Pos),
             "Cmp" => f.degree = Some(Degree::Cmp),
             "Sup" => f.degree = Some(Degree::Sup),
+            _ => counters.skipped_unknown_field += 1,
+        }
+    }
+    if let Some(s) = &rec.aux {
+        match s.as_str() {
+            "haben" => f.aux = Some(Aux::Haben),
+            "sein" => f.aux = Some(Aux::Sein),
+            "both" => f.aux = Some(Aux::Both),
             _ => counters.skipped_unknown_field += 1,
         }
     }

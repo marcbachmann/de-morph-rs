@@ -16,6 +16,7 @@ use std::io::Write;
 
 use fst::MapBuilder;
 
+use crate::analysis::Aux;
 use crate::analysis::Features;
 use crate::analysis::PackedFeatures;
 use crate::analysis::UPOS;
@@ -115,6 +116,9 @@ struct PendingRecord {
     pos: UPOS,
     source: Source,
     features: PackedFeatures,
+    /// Auxiliary code (0=unset/1=Haben/2=Sein/3=Both) — carried
+    /// separately because `PackedFeatures` is full and can't hold it.
+    aux: u8,
 }
 
 impl LexiconBuilder {
@@ -161,6 +165,7 @@ impl LexiconBuilder {
             pos,
             source,
             features: PackedFeatures::pack(features),
+            aux: Aux::to_code(features.aux),
         };
         let bucket = self.by_surface.entry(surface.to_string()).or_default();
         if !bucket.iter().any(|r| {
@@ -168,6 +173,7 @@ impl LexiconBuilder {
                 && r.pos == rec.pos
                 && r.source == rec.source
                 && r.features == rec.features
+                && r.aux == rec.aux
         }) {
             bucket.push(rec);
             self.total_records += 1;
@@ -220,6 +226,7 @@ impl LexiconBuilder {
                     pos: rec.pos as u8,
                     source: rec.source as u8,
                     packed_features: rec.features.0,
+                    aux: rec.aux,
                 };
                 analyses_bytes.extend_from_slice(&on_disk.to_bytes());
             }

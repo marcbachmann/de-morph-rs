@@ -15,6 +15,7 @@ use anyhow::Context;
 use anyhow::Result;
 use serde::Serialize;
 
+use de_morph::analysis::Aux;
 use de_morph::analysis::Mood;
 use de_morph::analysis::Number;
 use de_morph::analysis::Person;
@@ -46,6 +47,8 @@ struct OutputRecord<'a> {
     mood: Option<&'static str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     form: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    aux: Option<&'static str>,
     source: &'static str,
     source_title: &'a str,
 }
@@ -60,8 +63,17 @@ fn entry_to_record(e: &ExtractedEntry) -> OutputRecord<'_> {
         tense: e.features.tense.map(tense_str),
         mood: e.features.mood.map(mood_str),
         form: e.features.form.map(form_str),
+        aux: e.features.aux.map(aux_str),
         source: source_str(e.source),
         source_title: &e.source_title,
+    }
+}
+
+fn aux_str(a: Aux) -> &'static str {
+    match a {
+        Aux::Haben => "haben",
+        Aux::Sein => "sein",
+        Aux::Both => "both",
     }
 }
 

@@ -19,7 +19,7 @@
 //! - Parameter inventory verified against three real entries
 //!   (`lieben`, `sein`, `klieben`) sampled from the 20260601 dump.
 
-use crate::analysis::UPOS;
+use crate::analysis::{Aux, UPOS};
 use crate::paradigm::verb::{VerbAttested, generate_verb_paradigm};
 use crate::wiktionary::ExtractedEntry;
 use crate::wiktionary::template::Template;
@@ -33,7 +33,12 @@ pub fn extract_verbs(title: &str, page_text: &str) -> Vec<ExtractedEntry> {
             continue;
         }
         let inputs = parse_verb_template(title, &tpl);
-        for (surface, analysis) in generate_verb_paradigm(&inputs) {
+        // The perfect-tense auxiliary (haben/sein/both) is a lexical
+        // property of the verb, read from the `Hilfsverb` field and
+        // stamped on every cell of the paradigm.
+        let aux = parse_hilfsverb(tpl.named_arg("Hilfsverb"));
+        for (surface, mut analysis) in generate_verb_paradigm(&inputs) {
+            analysis.features.aux = aux;
             out.push(ExtractedEntry {
                 surface,
                 lemma: title.to_string(),
@@ -72,6 +77,21 @@ pub fn parse_verb_template<'a>(title: &'a str, tpl: &Template<'a>) -> VerbAttest
     }
 }
 
+/// Map the Wiktionary `Hilfsverb` field to an [`Aux`]. The field holds
+/// `haben`, `sein`, or both (`haben, sein` / `sein und haben`); we detect
+/// each keyword's presence so any separator works.
+fn parse_hilfsverb(value: Option<&str>) -> Option<Aux> {
+    let v = non_empty(value)?;
+    let has_haben = v.contains("haben");
+    let has_sein = v.contains("sein");
+    match (has_haben, has_sein) {
+        (true, true) => Some(Aux::Both),
+        (true, false) => Some(Aux::Haben),
+        (false, true) => Some(Aux::Sein),
+        (false, false) => None,
+    }
+}
+
 #[inline]
 fn non_empty(value: Option<&str>) -> Option<&str> {
     value.and_then(|s| {
@@ -87,10 +107,20 @@ fn non_empty(value: Option<&str>) -> Option<&str> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::analysis::{Mood, Number, Person, Source, Tense, VerbForm};
+    use crate::analysis::{Aux, Mood, Number, Person, Source, Tense, VerbForm};
 
     fn page(body: &str) -> String {
         format!("== Headword ({{{{Sprache|Deutsch}}}}) ==\n{{{{{body}}}}}\n")
+    }
+
+    #[test]
+    fn hilfsverb_maps_to_aux() {
+        assert_eq!(parse_hilfsverb(Some("haben")), Some(Aux::Haben));
+        assert_eq!(parse_hilfsverb(Some("sein")), Some(Aux::Sein));
+        assert_eq!(parse_hilfsverb(Some("haben, sein")), Some(Aux::Both));
+        assert_eq!(parse_hilfsverb(Some("sein und haben")), Some(Aux::Both));
+        assert_eq!(parse_hilfsverb(Some("—")), None);
+        assert_eq!(parse_hilfsverb(None), None);
     }
 
     #[test]
@@ -115,6 +145,8 @@ mod tests {
             assert_eq!(e.lemma, "lieben");
             assert_eq!(e.source_title, "lieben");
             assert_eq!(e.pos, UPOS::VERB);
+            // The Hilfsverb=haben field is stamped on every cell.
+            assert_eq!(e.features.aux, Some(Aux::Haben));
         }
 
         // Spot-check that attested forms are tagged Lexicon and derived

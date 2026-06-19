@@ -12,7 +12,7 @@ use std::path::Path;
 
 use fst::Map as FstMap;
 
-use crate::analysis::{Analysis, Case, Gender, Number, PackedFeatures, UPOS, Source};
+use crate::analysis::{Analysis, Aux, Case, Gender, Number, PackedFeatures, UPOS, Source};
 use crate::lexicon::format::{
     unpack_fst_value, AnalysisRecord, ANALYSIS_RECORD_SIZE, HEADER_SIZE, MAGIC, VERSION_MAJOR,
 };
@@ -586,7 +586,9 @@ impl Lexicon {
             2 => Source::Guessed,
             other => return Err(LoadError::InvalidSource(other)),
         };
-        let features = PackedFeatures(rec.packed_features).unpack();
+        let mut features = PackedFeatures(rec.packed_features).unpack();
+        // `aux` rides in the record's reserved bits, not the feature word.
+        features.aux = Aux::from_code(rec.aux);
         let lemma = self.lemma(rec.lemma_id)?;
         Ok(Analysis::with_source(lemma, pos, features, source))
     }

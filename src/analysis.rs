@@ -156,6 +156,45 @@ pub enum Voice {
     Pas = 1,
 }
 
+/// Perfect-tense auxiliary (Hilfsverb) a verb selects: `haben` or
+/// `sein` (a few verbs allow both, e.g. regional `hat`/`ist gestanden`).
+///
+/// This is a *lexical* property of the verb, not an inflectional feature
+/// of a particular form — it's surfaced on the verb's cells so a consumer
+/// can build the analytic perfect (`hat geliebt` vs `ist abgetaucht`).
+/// Sourced from Wiktionary's `Hilfsverb` template field.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(u8)]
+pub enum Aux {
+    Haben = 0,
+    Sein = 1,
+    /// Verb attests both auxiliaries (`haben, sein`).
+    Both = 2,
+}
+
+impl Aux {
+    /// Encode `Option<Aux>` as the 2-bit on-disk code (0 = unset,
+    /// 1 = Haben, 2 = Sein, 3 = Both) stored in the analysis record.
+    #[inline]
+    pub fn to_code(value: Option<Aux>) -> u8 {
+        match value {
+            None => 0,
+            Some(a) => a as u8 + 1,
+        }
+    }
+
+    /// Decode the 2-bit on-disk code back to `Option<Aux>`.
+    #[inline]
+    pub fn from_code(code: u8) -> Option<Aux> {
+        match code {
+            1 => Some(Aux::Haben),
+            2 => Some(Aux::Sein),
+            3 => Some(Aux::Both),
+            _ => None,
+        }
+    }
+}
+
 /// Verb form (Verbform).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u8)]
@@ -269,6 +308,11 @@ pub struct Features {
     pub poss_person: Option<Person>,
     /// Possessor's number (for possessives: `mein` → Sg, `unser` → Pl).
     pub poss_number: Option<Number>,
+    /// Perfect-tense auxiliary the verb selects (haben/sein/both). A
+    /// lexical property of the verb lemma, stamped on its cells. Stored
+    /// in the on-disk record's reserved bits, not the `PackedFeatures`
+    /// word (which is full); see [`crate::lexicon::format`].
+    pub aux: Option<Aux>,
 }
 
 impl Features {
@@ -288,6 +332,7 @@ impl Features {
             pron_type: None,
             poss_person: None,
             poss_number: None,
+            aux: None,
         }
     }
 
@@ -463,6 +508,12 @@ impl PackedFeatures {
             pron_type,
             poss_person,
             poss_number,
+            // `aux` is not carried in the PackedFeatures word (it is
+            // full); it rides in the on-disk record's reserved bits and
+            // is restored by the loader. A pure pack→unpack round-trip
+            // therefore drops `aux`, which is fine for its only such use
+            // (dedup keys, where aux is constant per lemma).
+            aux: None,
         }
     }
 }
@@ -719,6 +770,9 @@ mod tests {
             pron_type: Some(PronType::Art),
             poss_person: Some(Person::P3),
             poss_number: Some(Number::Pl),
+            // aux is not stored in the PackedFeatures word (it rides in
+            // the record's reserved bits), so it stays None here.
+            aux: None,
         };
         let packed = PackedFeatures::pack(f);
         assert_eq!(packed.0 >> 31, 0, "bit 31 must be reserved: {:b}", packed.0);

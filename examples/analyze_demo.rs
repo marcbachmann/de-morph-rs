@@ -162,7 +162,7 @@ fn print_one(analyzer: &Analyzer, surface: &str) {
     }
     for a in &analyses {
         println!(
-            "  {:<10} {:?}{}{}{}{}{}{}{}  source={:?}",
+            "  {:<10} {:?}{}{}{}{}{}{}{}{}  source={:?}",
             a.lemma,
             a.pos,
             opt(a.features.gender),
@@ -172,6 +172,7 @@ fn print_one(analyzer: &Analyzer, surface: &str) {
             opt(a.features.tense),
             opt(a.features.mood),
             opt(a.features.form),
+            opt(a.features.aux),
             a.source,
         );
     }
