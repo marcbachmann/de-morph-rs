@@ -59,6 +59,16 @@ pub type VerbCell = (String, Analysis);
 /// some Wiktionary fields are missing (the rule layer falls back to
 /// what it can derive from the infinitive alone).
 pub fn generate_verb_paradigm(inputs: &VerbAttested) -> Vec<VerbCell> {
+    // Separable verbs (abtauchen = ab + tauchen): Wiktionary stores the
+    // SEPARATED finite forms ("tauche ab"). Conjugate the base verb and
+    // join the prefix, emitting the single-token forms a token-based
+    // analyzer needs (abtauche, abzutauchen, abtauchend) rather than the
+    // unusable separated "tauche ab" or the wrong "brach ausst".
+    if let Some((prefix, base)) = split_separable(inputs) {
+        let base_cells = generate_verb_paradigm(&base);
+        return join_separable(prefix, base.infinitive, inputs.infinitive, base_cells);
+    }
+
     let mut out = Vec::with_capacity(32);
     let inf = inputs.infinitive;
     let stem = infinitive_stem(inf);
@@ -345,6 +355,92 @@ fn apply_suppletive_overrides(infinitive: &str, out: &mut Vec<VerbCell>) {
 // =========================================================================
 // Internals
 // =========================================================================
+
+/// If `inputs` describes a separable verb — the attested finite forms
+/// carry a separated prefix particle (present "tauche ab" for the
+/// infinitive "abtauchen") — split it into the prefix and a base
+/// [`VerbAttested`] with the particle removed. Returns `None` for
+/// ordinary (non-separable, inseparable-prefix) verbs.
+///
+/// Detection is data-driven: the particle is the trailing token of a
+/// separated finite form, and it must be a literal prefix of the
+/// infinitive. This avoids guessing from a prefix list and never
+/// misfires on inseparable prefixes (be-, ver-, ent-, …), whose forms
+/// are stored joined and contain no space.
+fn split_separable<'a>(inputs: &VerbAttested<'a>) -> Option<(&'a str, VerbAttested<'a>)> {
+    let candidates = [
+        inputs.present_3sg,
+        inputs.present_1sg,
+        inputs.present_2sg,
+        inputs.past_1sg,
+        inputs.imperativ_sg,
+    ];
+    let particle = candidates
+        .into_iter()
+        .flatten()
+        .find_map(|f| f.rsplit_once(' ').map(|(_, p)| p))?;
+    let inf = inputs.infinitive;
+    if particle.is_empty() || !inf.starts_with(particle) {
+        return None;
+    }
+    let base_inf = &inf[particle.len()..];
+    if base_inf.len() < 2 || !(base_inf.ends_with("en") || base_inf.ends_with('n')) {
+        return None;
+    }
+    let prefix = &inf[..particle.len()];
+
+    // Strip the trailing " {particle}" from a separated finite form.
+    let strip_fin = |f: Option<&'a str>| -> Option<&'a str> {
+        let s = f?;
+        match s.strip_suffix(particle) {
+            Some(head) if head.ends_with(' ') => Some(head.trim_end()),
+            _ => Some(s),
+        }
+    };
+    // Partizip II is already joined (abgetaucht); strip the LEADING prefix.
+    let base_partizip = inputs
+        .partizip_perf
+        .map(|p| p.strip_prefix(prefix).unwrap_or(p));
+
+    let base = VerbAttested {
+        infinitive: base_inf,
+        present_1sg: strip_fin(inputs.present_1sg),
+        present_2sg: strip_fin(inputs.present_2sg),
+        present_3sg: strip_fin(inputs.present_3sg),
+        past_1sg: strip_fin(inputs.past_1sg),
+        konj_ii_1sg: strip_fin(inputs.konj_ii_1sg),
+        // Separable imperatives are inherently two-token ("tauch ab") —
+        // skip them rather than emit the non-word "abtauch".
+        imperativ_sg: None,
+        imperativ_pl: None,
+        partizip_perf: base_partizip,
+    };
+    Some((prefix, base))
+}
+
+/// Re-attach the separable prefix to every base-paradigm cell, producing
+/// single-token surfaces and re-lemmatising to the separable infinitive.
+/// The zu-infinitive is special: `zu` goes BETWEEN prefix and base
+/// (`abzutauchen`), not in front (`zu abtauchen`).
+fn join_separable(
+    prefix: &str,
+    base_inf: &str,
+    separable_inf: &str,
+    base_cells: Vec<VerbCell>,
+) -> Vec<VerbCell> {
+    base_cells
+        .into_iter()
+        .map(|(surface, mut analysis)| {
+            let joined = if analysis.features.form == Some(VerbForm::InfZu) {
+                format!("{prefix}zu{base_inf}")
+            } else {
+                format!("{prefix}{surface}")
+            };
+            analysis.lemma = separable_inf.to_string();
+            (joined, analysis)
+        })
+        .collect()
+}
 
 #[inline]
 fn push(
@@ -894,6 +990,95 @@ mod tests {
             Some(VerbForm::Fin),
         );
         assert_eq!(pi_1pl, vec![("lieben".into(), Source::Generated)]);
+    }
+
+    #[test]
+    fn separable_weak_verb_joins_prefix() {
+        // "abtauchen" = ab + tauchen. Wiktionary stores the SEPARATED
+        // finite forms ("tauche ab"). We emit the joined single-token
+        // forms a token-based analyzer needs: abtauche / abtauchst /
+        // abzutauchen / abtauchend, never "tauche ab" or "zu abtauchen".
+        let inputs = VerbAttested {
+            infinitive: "abtauchen",
+            present_1sg: Some("tauche ab"),
+            present_2sg: Some("tauchst ab"),
+            present_3sg: Some("taucht ab"),
+            past_1sg: Some("tauchte ab"),
+            konj_ii_1sg: Some("tauchte ab"),
+            imperativ_sg: Some("tauch ab"),
+            imperativ_pl: Some("taucht ab"),
+            partizip_perf: Some("abgetaucht"),
+        };
+        let cells = generate_verb_paradigm(&inputs);
+        assert!(
+            cells.iter().all(|(s, _)| !s.contains(' ')),
+            "separable paradigm must be single-token, got {cells:#?}"
+        );
+        assert!(cells.iter().all(|(_, a)| a.lemma == "abtauchen"));
+        let has = |q: &str| cells.iter().any(|(s, _)| s == q);
+        assert!(has("abtauchen"), "Inf");
+        assert!(has("abzutauchen"), "zu-Inf");
+        assert!(has("abtauchend"), "PtcPres");
+        assert!(has("abgetaucht"), "PtcPerf");
+        assert!(has("abtauche"), "1Sg pres");
+        assert!(has("abtauchst"), "2Sg pres");
+        assert!(has("abtaucht"), "3Sg pres");
+        assert!(has("abtauchte"), "1Sg past");
+        assert!(has("abtauchtest"), "2Sg past");
+        assert!(!has("zu abtauchen"), "wrong zu-inf must be gone");
+        // Imperatives are inherently separated (two-token) — not emitted.
+        assert!(
+            find(&cells, Some(Person::P2), Some(Number::Sg), None, Some(Mood::Imp), Some(VerbForm::Fin)).is_empty()
+        );
+    }
+
+    #[test]
+    fn separable_strong_verb_joins_prefix() {
+        // "ausbrechen" = aus + brechen (strong). Previously produced
+        // garbage like "brach ausst"; now joins correctly.
+        let inputs = VerbAttested {
+            infinitive: "ausbrechen",
+            present_1sg: Some("breche aus"),
+            present_2sg: Some("brichst aus"),
+            present_3sg: Some("bricht aus"),
+            past_1sg: Some("brach aus"),
+            konj_ii_1sg: Some("bräche aus"),
+            imperativ_sg: Some("brich aus"),
+            imperativ_pl: Some("brecht aus"),
+            partizip_perf: Some("ausgebrochen"),
+        };
+        let cells = generate_verb_paradigm(&inputs);
+        let has = |q: &str| cells.iter().any(|(s, _)| s == q);
+        assert!(cells.iter().all(|(s, _)| !s.contains(' ')));
+        assert!(has("ausbrechen") && has("auszubrechen") && has("ausgebrochen"));
+        assert!(has("ausbricht"), "3Sg");
+        assert!(has("ausbreche"), "1Sg");
+        assert!(has("ausbrach"), "1Sg past");
+        assert!(has("ausbrachst"), "2Sg past (ch, no epenthesis)");
+        assert!(!has("brach ausst"));
+    }
+
+    #[test]
+    fn separable_sibilant_base_past_2sg_gets_epenthesis() {
+        // "ausreißen" = aus + reißen; base past "riss" ends in a sibilant,
+        // so 2Sg is "rissest" → joined "ausrissest" (composes with the
+        // sibilant-epenthesis rule).
+        let inputs = VerbAttested {
+            infinitive: "ausreißen",
+            present_1sg: Some("reiße aus"),
+            present_2sg: Some("reißt aus"),
+            present_3sg: Some("reißt aus"),
+            past_1sg: Some("riss aus"),
+            konj_ii_1sg: Some("risse aus"),
+            imperativ_sg: Some("reiß aus"),
+            imperativ_pl: Some("reißt aus"),
+            partizip_perf: Some("ausgerissen"),
+        };
+        let cells = generate_verb_paradigm(&inputs);
+        let has = |q: &str| cells.iter().any(|(s, _)| s == q);
+        assert!(cells.iter().all(|(s, _)| !s.contains(' ')));
+        assert!(has("auszureißen") && has("ausgerissen"));
+        assert!(has("ausrissest"), "joined sibilant past 2Sg");
     }
 
     #[test]
