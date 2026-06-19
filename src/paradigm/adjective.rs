@@ -169,6 +169,20 @@ fn apply_all_endings(out: &mut Vec<AdjectiveCell>, stem: &str, lemma: &str, degr
 /// Stems with no elidable shape get plain final-`e` schwa-deletion
 /// (`leise` → `leis`), applied to every degree by the callers.
 fn positive_attributive_stem(lemma: &str, komparativ: Option<&str>) -> String {
+    // "hoch" (and -hoch compounds: haushoch, turmhoch, …) inflect
+    // attributively on the stem "hoh-": hohe / hoher / hohes. The bare
+    // predicative keeps "hoch"; only the attributive forms drop the -c-.
+    if let Some(prefix) = lemma.strip_suffix("hoch") {
+        return format!("{prefix}hoh");
+    }
+    // Indeclinable -a color adjectives (rosa, lila) have no Standard
+    // inflection; colloquially they take an -n- linker before the
+    // ending: rosa → rosan- → rosane / rosaner / rosanes. Appending the
+    // ending straight to the -a (rosaer) is not German. The bare
+    // predicative "rosa" is emitted separately and stays uninflected.
+    if lemma.ends_with('a') {
+        return format!("{lemma}n");
+    }
     if let Some(elided) = elide_unstressed_medial_e(lemma) {
         let komparativ_keeps_e = komparativ.is_some_and(|k| k == format!("{lemma}er"));
         if komparativ_keeps_e {
@@ -637,6 +651,91 @@ mod tests {
         for bad in ["teuere", "teuerer", "teuerem"] {
             assert!(!surfaces.contains(&bad), "over-generated invalid {bad:?}");
         }
+    }
+
+    #[test]
+    fn indeclinable_a_adjective_takes_n_linker() {
+        // rosa / lila are uninflected in Standard German; colloquially
+        // they inflect with an -n- linker (rosane / rosaner / rosanes),
+        // NOT by appending the ending straight to the -a (the invalid
+        // rosae / rosaer). The bare predicative stays "rosa".
+        let inputs = AdjectiveAttested {
+            lemma: "rosa",
+            komparativ: None,
+            superlativ: None,
+        };
+        let cells = generate_adjective_paradigm(&inputs);
+        let pos = |c, n, g| {
+            find(
+                &cells,
+                Degree::Pos,
+                Some(Declension::Strong),
+                Some(c),
+                Some(n),
+                Some(g),
+            )
+        };
+        assert_eq!(pos(Case::Nom, Number::Sg, Gender::Fem), vec!["rosane"]);
+        assert_eq!(pos(Case::Nom, Number::Sg, Gender::Masc), vec!["rosaner"]);
+        assert_eq!(pos(Case::Nom, Number::Sg, Gender::Neut), vec!["rosanes"]);
+        let surfaces: Vec<&str> = cells.iter().map(|(s, _)| s.as_str()).collect();
+        for bad in ["rosae", "rosaer", "rosaes", "rosaem", "rosaen"] {
+            assert!(!surfaces.contains(&bad), "over-generated invalid {bad:?}");
+        }
+        assert_eq!(find(&cells, Degree::Pos, None, None, None, None), vec!["rosa"]);
+    }
+
+    #[test]
+    fn hoch_uses_hoh_stem_in_attributive() {
+        // "hoch" inflects attributively on the stem "hoh-": hohe / hoher
+        // / hohes / hohem / hohen. The bare predicative stays "hoch"; the
+        // comparative (höher) and superlative (höchst-) are unaffected.
+        let inputs = AdjectiveAttested {
+            lemma: "hoch",
+            komparativ: Some("höher"),
+            superlativ: Some("höchsten"),
+        };
+        let cells = generate_adjective_paradigm(&inputs);
+        let pos = |c, n, g| {
+            find(
+                &cells,
+                Degree::Pos,
+                Some(Declension::Strong),
+                Some(c),
+                Some(n),
+                Some(g),
+            )
+        };
+        assert_eq!(pos(Case::Nom, Number::Sg, Gender::Fem), vec!["hohe"]);
+        assert_eq!(pos(Case::Nom, Number::Sg, Gender::Masc), vec!["hoher"]);
+        assert_eq!(pos(Case::Nom, Number::Sg, Gender::Neut), vec!["hohes"]);
+        assert_eq!(pos(Case::Dat, Number::Sg, Gender::Masc), vec!["hohem"]);
+        let surfaces: Vec<&str> = cells.iter().map(|(s, _)| s.as_str()).collect();
+        for bad in ["hoche", "hocher", "hoches", "hochem", "hochen"] {
+            assert!(!surfaces.contains(&bad), "over-generated invalid {bad:?}");
+        }
+        assert_eq!(find(&cells, Degree::Pos, None, None, None, None), vec!["hoch"]);
+    }
+
+    #[test]
+    fn hoch_compound_uses_hoh_stem() {
+        // -hoch compounds inflect the same way: haushoch → haushohe.
+        let inputs = AdjectiveAttested {
+            lemma: "haushoch",
+            komparativ: None,
+            superlativ: None,
+        };
+        let cells = generate_adjective_paradigm(&inputs);
+        let fem_nom = find(
+            &cells,
+            Degree::Pos,
+            Some(Declension::Strong),
+            Some(Case::Nom),
+            Some(Number::Sg),
+            Some(Gender::Fem),
+        );
+        assert_eq!(fem_nom, vec!["haushohe"]);
+        assert!(!cells.iter().any(|(s, _)| s == "haushoche"));
     }
 
     #[test]

@@ -281,6 +281,9 @@ mod tests {
             "rosa-class should still produce its full attributive paradigm \
              (1 predicative + 72 attributive) so colloquial forms remain reachable"
         );
-        assert!(entries.iter().any(|e| e.surface == "rosaer"));
+        // The colloquial inflection uses an -n- linker (rosane/rosaner),
+        // not the invalid "rosaer"; the bare "rosa" stays uninflected.
+        assert!(entries.iter().any(|e| e.surface == "rosaner"));
+        assert!(!entries.iter().any(|e| e.surface == "rosaer"));
     }
 }
