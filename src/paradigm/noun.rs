@@ -368,7 +368,49 @@ fn genitive_singular_forms(lemma: &str) -> Vec<String> {
     if l.ends_with('e') {
         return vec![format!("{l}s")];
     }
+    // Polysyllabic nouns ending in unstressed -el/-er/-en take Gen Sg
+    // `-s` only (des Lehrers, des Wagens, des Onkels); the `-es` variant
+    // (Lehreres) is not German. Monosyllables (Meer, Heer) keep both and
+    // fall through. Counting vowel groups approximates the syllable
+    // count well enough to tell "Lehrer" (2) from "Meer" (1).
+    if takes_s_only_genitive(l) {
+        return vec![format!("{l}s")];
+    }
     vec![format!("{l}es"), format!("{l}s")]
+}
+
+/// Whether a noun lemma takes Gen Sg `-s` only (no `-es` variant):
+/// it ends in unstressed `-el` / `-er` / `-en` AND has at least two
+/// vowel groups (i.e. is polysyllabic).
+fn takes_s_only_genitive(lemma: &str) -> bool {
+    let unstressed_suffix =
+        lemma.ends_with("el") || lemma.ends_with("er") || lemma.ends_with("en");
+    unstressed_suffix && count_vowel_groups(lemma) >= 2
+}
+
+/// Count maximal runs of vowels (including umlauts) in `lemma`. A rough
+/// syllable-count proxy: `Lehrer` → 2 (`e`, `e`), `Meer` → 1 (`ee`).
+fn count_vowel_groups(lemma: &str) -> usize {
+    let is_vowel = |c: char| {
+        matches!(
+            c,
+            'a' | 'e' | 'i' | 'o' | 'u' | 'ä' | 'ö' | 'ü' | 'y'
+                | 'A' | 'E' | 'I' | 'O' | 'U' | 'Ä' | 'Ö' | 'Ü' | 'Y'
+        )
+    };
+    let mut groups = 0;
+    let mut in_vowel = false;
+    for c in lemma.chars() {
+        if is_vowel(c) {
+            if !in_vowel {
+                groups += 1;
+            }
+            in_vowel = true;
+        } else {
+            in_vowel = false;
+        }
+    }
+    groups
 }
 
 /// The oblique stem for a weak masculine (Gen/Dat/Acc Sg, and all plural
@@ -579,6 +621,34 @@ mod tests {
         assert_eq!(dative_plural("Autos"), "Autos");
         assert_eq!(dative_plural("Männer"), "Männern");
         assert_eq!(dative_plural("Kinder"), "Kindern");
+    }
+
+    #[test]
+    fn genitive_sg_polysyllabic_unstressed_suffix_takes_only_s() {
+        // Polysyllabic nouns in unstressed -el/-er/-en take Gen Sg -s
+        // only (des Lehrers, des Wagens, des Onkels) — the -es variant
+        // (Lehreres) is not German and must not be generated.
+        for (lemma, expect) in [
+            ("Lehrer", "Lehrers"),
+            ("Messer", "Messers"),
+            ("Wagen", "Wagens"),
+            ("Onkel", "Onkels"),
+        ] {
+            assert_eq!(
+                genitive_singular_forms(lemma),
+                vec![expect.to_string()],
+                "{lemma}"
+            );
+        }
+    }
+
+    #[test]
+    fn genitive_sg_monosyllabic_er_keeps_both_variants() {
+        // "Meer" is monosyllabic (one vowel group "ee") → both des
+        // Meeres and des Meers are valid; keep both.
+        let g = genitive_singular_forms("Meer");
+        assert!(g.contains(&"Meeres".to_string()), "{g:?}");
+        assert!(g.contains(&"Meers".to_string()), "{g:?}");
     }
 
     #[test]

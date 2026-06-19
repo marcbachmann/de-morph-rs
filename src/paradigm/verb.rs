@@ -307,6 +307,17 @@ const SUPPLETIVE_OVERRIDES: &[(&str, &[OverrideCell])] = &[
     // layer once their attested Wiktionary fields are in place
     // (`habst`/`hast`, `wirst`/`wird`, etc. are stored). No override
     // entries needed for v0.
+    (
+        "tun",
+        &[
+            // The only other non-`-en` infinitive: `PtcPres = inf + "d"`
+            // yields the invalid "tund"; the correct participle is
+            // "tuend". Present plural (wir/sie tun, ihr tut), Konj I
+            // (tue/tuest/…) and the past (tat-) are all derived
+            // correctly by the rule layer, so only PtcPres needs fixing.
+            OverrideCell::ptc_pres("tuend"),
+        ],
+    ),
 ];
 
 fn apply_suppletive_overrides(infinitive: &str, out: &mut Vec<VerbCell>) {
@@ -786,6 +797,35 @@ mod tests {
         // Rule would yield "seind"; override gives "seiend".
         assert_eq!(ptc.0, "seiend");
         assert_eq!(ptc.1.source, Source::Lexicon);
+    }
+
+    #[test]
+    fn tun_suppletive_override_fixes_ptc_pres() {
+        // "tun" is one of only two non-`-en` infinitives (with "sein").
+        // The rule `PtcPres = inf + "d"` yields the invalid "tund"; the
+        // correct present participle is "tuend".
+        let inputs = VerbAttested {
+            infinitive: "tun",
+            present_1sg: Some("tue"),
+            present_2sg: Some("tust"),
+            present_3sg: Some("tut"),
+            past_1sg: Some("tat"),
+            konj_ii_1sg: Some("täte"),
+            imperativ_sg: Some("tu"),
+            imperativ_pl: Some("tut"),
+            partizip_perf: Some("getan"),
+        };
+        let cells = generate_verb_paradigm(&inputs);
+        let ptc = cells
+            .iter()
+            .find(|(_, a)| a.features.form == Some(VerbForm::PtcPres))
+            .expect("PtcPres missing");
+        assert_eq!(ptc.0, "tuend");
+        assert_eq!(ptc.1.source, Source::Lexicon);
+        assert!(
+            !cells.iter().any(|(s, _)| s == "tund"),
+            "over-generated invalid 'tund'"
+        );
     }
 
     #[test]

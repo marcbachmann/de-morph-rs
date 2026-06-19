@@ -115,7 +115,7 @@ fn apply_all_endings(out: &mut Vec<AdjectiveCell>, stem: &str, lemma: &str, degr
     use Gender::*;
     use Number::*;
 
-    let effective_stem = schwa_delete(stem);
+    let effective_stem = inflection_stem(stem, degree);
 
     let declensions = [Strong, Weak, Mixed];
     let cases = [Nom, Gen, Dat, Acc];
@@ -146,6 +146,70 @@ fn apply_all_endings(out: &mut Vec<AdjectiveCell>, stem: &str, lemma: &str, degr
             }
         }
     }
+}
+
+/// Compute the stem that inflectional endings are appended to, given
+/// the degree being generated.
+///
+/// Two distinct elisions apply, both before any vowel-initial ending:
+/// - **Positive degree only**: the unstressed medial `-e-` of `-el`
+///   and vowel+`-er` stems is dropped (`dunkel` → `dunkl` → `dunkle`,
+///   `teuer` → `teur` → `teure`). This is gated to the positive degree
+///   because the comparative carries its own `-er` morpheme
+///   (`dunkler` must inflect to `dunklere`, not `dunkle`) and the
+///   superlative keeps its `-e-` (`dunkelste`).
+/// - **All degrees**: final unstressed `-e` is dropped to avoid
+///   doubling (`leise` → `leis` → `leise`), via [`schwa_delete`].
+fn inflection_stem(stem: &str, degree: Degree) -> String {
+    if degree == Degree::Pos {
+        if let Some(elided) = elide_unstressed_medial_e(stem) {
+            return elided;
+        }
+    }
+    schwa_delete(stem).to_string()
+}
+
+/// Drop the unstressed medial `-e-` of an `-el` / vowel+`-er` stem.
+///
+/// Returns `Some` only when the elision is reliably correct:
+/// - `-el` preceded by a consonant other than `l` (`dunkel`→`dunkl`,
+///   `edel`→`edl`, `nobel`→`nobl`). The `l` guard skips stressed
+///   `parallel` (whose `-e-` stays), and double-`l` stems (`-ell`,
+///   e.g. `aktuell`) never end in `-el` so they're excluded already.
+/// - `-er` preceded by a vowel (`teuer`→`teur`, `sauer`→`saur`).
+///   Consonant+`-er` (`bitter`, `finster`, `sauber`) keeps its `-e-`,
+///   because `bittere` is the standard form there.
+///
+/// Returns `None` for every other stem (no elision).
+fn elide_unstressed_medial_e(stem: &str) -> Option<String> {
+    let chars: Vec<char> = stem.chars().collect();
+    let n = chars.len();
+    if n < 3 {
+        return None;
+    }
+    let last = chars[n - 1];
+    if chars[n - 2] != 'e' {
+        return None;
+    }
+    let before = chars[n - 3];
+    match last {
+        'l' if !is_german_vowel(before) && before != 'l' => {}
+        'r' if is_german_vowel(before) => {}
+        _ => return None,
+    }
+    // Drop the `e` at position n-2; keep the final consonant.
+    let mut out = String::with_capacity(stem.len());
+    out.extend(&chars[..n - 2]);
+    out.push(last);
+    Some(out)
+}
+
+/// German vowels (including umlauts) for the schwa-elision rule.
+fn is_german_vowel(c: char) -> bool {
+    matches!(
+        c,
+        'a' | 'e' | 'i' | 'o' | 'u' | 'ä' | 'ö' | 'ü' | 'A' | 'E' | 'I' | 'O' | 'U' | 'Ä' | 'Ö' | 'Ü'
+    )
 }
 
 /// Schwa-deletion: if the stem ends in a single unstressed `-e`, drop
@@ -465,6 +529,153 @@ mod tests {
             Some(Gender::Masc),
         );
         assert_eq!(strong_nom_masc, vec!["leiser"]);
+    }
+
+    #[test]
+    fn unstressed_el_stem_elides_in_positive_attributive() {
+        // "dunkel" — German drops the unstressed medial -e- before any
+        // inflectional ending: dunkle / dunkler / dunkles / dunklem /
+        // dunklen. The bare predicative stays "dunkel". The comparative
+        // ("dunkler", stored) and superlative ("dunkelst-") are NOT
+        // touched by this rule.
+        let inputs = AdjectiveAttested {
+            lemma: "dunkel",
+            komparativ: Some("dunkler"),
+            superlativ: Some("dunkelsten"),
+        };
+        let cells = generate_adjective_paradigm(&inputs);
+        let pos = |c, n, g| {
+            find(
+                &cells,
+                Degree::Pos,
+                Some(Declension::Strong),
+                Some(c),
+                Some(n),
+                Some(g),
+            )
+        };
+        assert_eq!(pos(Case::Nom, Number::Sg, Gender::Fem), vec!["dunkle"]);
+        assert_eq!(pos(Case::Nom, Number::Sg, Gender::Masc), vec!["dunkler"]);
+        assert_eq!(pos(Case::Nom, Number::Sg, Gender::Neut), vec!["dunkles"]);
+        assert_eq!(pos(Case::Dat, Number::Sg, Gender::Masc), vec!["dunklem"]);
+        let weak_acc_masc = find(
+            &cells,
+            Degree::Pos,
+            Some(Declension::Weak),
+            Some(Case::Acc),
+            Some(Number::Sg),
+            Some(Gender::Masc),
+        );
+        assert_eq!(weak_acc_masc, vec!["dunklen"]);
+
+        // The invalid un-elided forms must NOT appear anywhere.
+        let surfaces: Vec<&str> = cells.iter().map(|(s, _)| s.as_str()).collect();
+        for bad in ["dunkele", "dunkeler", "dunkelem", "dunkeles", "dunkelen"] {
+            assert!(!surfaces.contains(&bad), "over-generated invalid {bad:?}");
+        }
+
+        // Predicative positive keeps the full stem.
+        assert_eq!(find(&cells, Degree::Pos, None, None, None, None), vec!["dunkel"]);
+
+        // Comparative must NOT be elided by the -er rule: "dunkler" + "e"
+        // = "dunklere", not "dunkle".
+        let cmp_fem_nom = find(
+            &cells,
+            Degree::Cmp,
+            Some(Declension::Strong),
+            Some(Case::Nom),
+            Some(Number::Sg),
+            Some(Gender::Fem),
+        );
+        assert_eq!(cmp_fem_nom, vec!["dunklere"]);
+
+        // Superlative keeps its -e- ("dunkelste", not "dunklste").
+        let sup_weak_masc_nom = find(
+            &cells,
+            Degree::Sup,
+            Some(Declension::Weak),
+            Some(Case::Nom),
+            Some(Number::Sg),
+            Some(Gender::Masc),
+        );
+        assert_eq!(sup_weak_masc_nom, vec!["dunkelste"]);
+    }
+
+    #[test]
+    fn vowel_er_stem_elides_in_positive_attributive() {
+        // "teuer" — the -e- after a vowel drops: teure / teurer / teures.
+        let inputs = AdjectiveAttested {
+            lemma: "teuer",
+            komparativ: Some("teurer"),
+            superlativ: Some("teuersten"),
+        };
+        let cells = generate_adjective_paradigm(&inputs);
+        let pos = |c, n, g| {
+            find(
+                &cells,
+                Degree::Pos,
+                Some(Declension::Strong),
+                Some(c),
+                Some(n),
+                Some(g),
+            )
+        };
+        assert_eq!(pos(Case::Nom, Number::Sg, Gender::Fem), vec!["teure"]);
+        assert_eq!(pos(Case::Nom, Number::Sg, Gender::Masc), vec!["teurer"]);
+        assert_eq!(pos(Case::Dat, Number::Sg, Gender::Masc), vec!["teurem"]);
+        let surfaces: Vec<&str> = cells.iter().map(|(s, _)| s.as_str()).collect();
+        for bad in ["teuere", "teuerer", "teuerem"] {
+            assert!(!surfaces.contains(&bad), "over-generated invalid {bad:?}");
+        }
+    }
+
+    #[test]
+    fn stressed_el_stem_is_not_elided() {
+        // "parallel" is stressed on the final syllable; the -e- stays:
+        // parallele / paralleler. (Eliding would yield garbage "parallle".)
+        let inputs = AdjectiveAttested {
+            lemma: "parallel",
+            komparativ: None,
+            superlativ: None,
+        };
+        let cells = generate_adjective_paradigm(&inputs);
+        let pos = |c, n, g| {
+            find(
+                &cells,
+                Degree::Pos,
+                Some(Declension::Strong),
+                Some(c),
+                Some(n),
+                Some(g),
+            )
+        };
+        assert_eq!(pos(Case::Nom, Number::Sg, Gender::Fem), vec!["parallele"]);
+        assert_eq!(pos(Case::Nom, Number::Sg, Gender::Masc), vec!["paralleler"]);
+    }
+
+    #[test]
+    fn consonant_er_stem_is_not_elided() {
+        // "bitter" — the -e- after a consonant stays: "bittere",
+        // "bitterer" are the standard forms (eliding to "bittre" is at
+        // best poetic and would drop the standard form).
+        let inputs = AdjectiveAttested {
+            lemma: "bitter",
+            komparativ: None,
+            superlativ: None,
+        };
+        let cells = generate_adjective_paradigm(&inputs);
+        let pos = |c, n, g| {
+            find(
+                &cells,
+                Degree::Pos,
+                Some(Declension::Strong),
+                Some(c),
+                Some(n),
+                Some(g),
+            )
+        };
+        assert_eq!(pos(Case::Nom, Number::Sg, Gender::Fem), vec!["bittere"]);
+        assert_eq!(pos(Case::Nom, Number::Sg, Gender::Masc), vec!["bitterer"]);
     }
 
     #[test]
