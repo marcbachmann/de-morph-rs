@@ -9,8 +9,10 @@
 //!
 //! # Status
 //!
-//! Pre-alpha. The runtime API surface is a stub; no analysis data is bundled
-//! yet.
+//! Pre-alpha. The analyzer is implemented — FST-backed lexicon lookup
+//! with Swiss-orthography, hyphenated-compound, and OOV-guessing
+//! fallbacks — but the published crate bundles no data and the API and
+//! on-disk formats may still change.
 
 pub mod analysis;
 pub mod analyzer;

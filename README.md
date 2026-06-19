@@ -3,9 +3,12 @@
 German morphological analyzer based on finite-state transducers, written
 in Rust.
 
-Status: **pre-alpha**. The repository currently contains project
-scaffolding, an attribution discipline, and a curated literature index.
-The analyzer itself is a stub.
+Status: **pre-alpha**. The repository contains project scaffolding, an
+attribution discipline, a curated literature index, and a working
+analyzer: FST-backed lexicon lookup with fallbacks for Swiss `ss`/`ß`
+orthography, hyphenated compounds, and out-of-vocabulary guessing
+(noun/verb/adjective paradigms). APIs and on-disk formats may still
+change.
 
 ## Licensing model
 
@@ -63,8 +66,12 @@ exporting analyzed pairs into the same runtime format.
 
     cargo build
 
-No data is bundled in `v0.0.1`. The analyzer compiles and exposes an
-API stub; `analyze()` returns the empty vector.
+The published crate bundles no data (`data/` is excluded from the
+package — see `exclude` in `Cargo.toml`). With no lexicon loaded the
+analyzer still returns best-effort out-of-vocabulary guesses; for real
+coverage, build a lexicon and open it with `Analyzer::open`. A
+Wiktionary-derived lexicon lives under `data/lexicon/` in the repo for
+development and evaluation.
 
 ## Contributing
 
