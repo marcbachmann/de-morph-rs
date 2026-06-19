@@ -71,6 +71,28 @@ impl From<fst::Error> for BuildError {
     }
 }
 
+/// Reject surfaces contaminated by leaked wikitext/HTML markup or control
+/// whitespace — unstripped HTML comments (`isometrischer <!--…-->`),
+/// `<small>`/`<ref>` tags, embedded newlines/tabs, doubled
+/// braces/brackets, or 2+ consecutive spaces from a mis-parsed template
+/// field. Such strings are not German words and must not enter the FST.
+///
+/// Deliberately permissive about a *single* space and a *single* bracket:
+/// `zu lieben` (zu-infinitive), multiword lemmas, and the bracket
+/// punctuation entries (`[`, `]`, `{`, `}`) are all legitimate surfaces.
+pub fn is_clean_surface(surface: &str) -> bool {
+    !(surface.contains('<')
+        || surface.contains('>')
+        || surface.contains('\n')
+        || surface.contains('\r')
+        || surface.contains('\t')
+        || surface.contains("{{")
+        || surface.contains("}}")
+        || surface.contains("[[")
+        || surface.contains("]]")
+        || surface.contains("  "))
+}
+
 /// Streaming builder. Records are added in arbitrary order; sorting
 /// and FST/side-table emission happens in [`LexiconBuilder::finish`].
 #[derive(Default)]
@@ -281,6 +303,29 @@ mod tests {
     use super::*;
     use crate::analysis::{Case, Gender, Number};
     use crate::lexicon::load::Lexicon;
+
+    #[test]
+    fn is_clean_surface_keeps_legit_and_rejects_markup() {
+        // Legit surfaces — incl. zu-infinitives, compounds, multiword
+        // lemmas, and the single-bracket punctuation entries.
+        for ok in [
+            "Tisch", "groß", "zu lieben", "stilllegen", "so genannte", "[", "]", "{", "}", "...",
+        ] {
+            assert!(is_clean_surface(ok), "wrongly rejected {ok:?}");
+        }
+        // Contaminated surfaces from leaked template markup / whitespace.
+        for bad in [
+            "isometrischer      <!--laut Duden keine Steigerung-->er",
+            "<small>(schneibte)</small>",
+            "tauchte  ab",
+            "-ige\n<!--",
+            "Foo{{x}}",
+            "a[[b]]",
+            "x\ty",
+        ] {
+            assert!(!is_clean_surface(bad), "failed to reject {bad:?}");
+        }
+    }
 
     #[test]
     fn build_and_load_roundtrip_minimal() {

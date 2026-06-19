@@ -31,6 +31,7 @@ use de_morph::analysis::UPOS;
 use de_morph::analysis::Source;
 use de_morph::analysis::Tense;
 use de_morph::analysis::VerbForm;
+use de_morph::lexicon::is_clean_surface;
 use de_morph::lexicon::LexiconBuilder;
 use de_morph::paradigm::generate_closed_class_entries;
 
@@ -64,6 +65,7 @@ struct Record {
 struct Counters {
     parsed: u64,
     skipped_unknown_field: u64,
+    skipped_contaminated: u64,
     by_pos: HashMap<&'static str, u64>,
     by_source: HashMap<&'static str, u64>,
 }
@@ -77,6 +79,7 @@ fn main() -> Result<()> {
     let mut counters = Counters {
         parsed: 0,
         skipped_unknown_field: 0,
+        skipped_contaminated: 0,
         by_pos: HashMap::new(),
         by_source: HashMap::new(),
     };
@@ -129,6 +132,12 @@ fn main() -> Result<()> {
         eprintln!(
             "  ({} records had unrecognised enum values and were skipped)",
             counters.skipped_unknown_field
+        );
+    }
+    if counters.skipped_contaminated > 0 {
+        eprintln!(
+            "  ({} surfaces dropped as contaminated markup/whitespace)",
+            counters.skipped_contaminated
         );
     }
 
@@ -185,6 +194,15 @@ fn ingest_file(
         let line = line?;
         let rec: Record = serde_json::from_str(&line)
             .with_context(|| format!("line {}", lineno + 1))?;
+
+        // Drop surfaces contaminated by leaked wikitext/HTML markup or
+        // control whitespace (HTML comments, <small> tags, embedded
+        // newlines, doubled braces, double spaces). These are extraction
+        // artifacts, not German words, and must never enter the FST.
+        if !is_clean_surface(&rec.surface) {
+            counters.skipped_contaminated += 1;
+            continue;
+        }
 
         let pos = match parse_pos(&rec.pos) {
             Some(p) => p,
