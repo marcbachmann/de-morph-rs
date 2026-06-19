@@ -71,26 +71,29 @@ impl From<fst::Error> for BuildError {
     }
 }
 
-/// Reject surfaces contaminated by leaked wikitext/HTML markup or control
-/// whitespace — unstripped HTML comments (`isometrischer <!--…-->`),
-/// `<small>`/`<ref>` tags, embedded newlines/tabs, doubled
-/// braces/brackets, or 2+ consecutive spaces from a mis-parsed template
-/// field. Such strings are not German words and must not enter the FST.
+/// Whether a surface belongs in the analyzer FST. Rejects:
 ///
-/// Deliberately permissive about a *single* space and a *single* bracket:
-/// `zu lieben` (zu-infinitive), multiword lemmas, and the bracket
-/// punctuation entries (`[`, `]`, `{`, `}`) are all legitimate surfaces.
+/// - **Any whitespace.** The analyzer is keyed on single whitespace
+///   tokens, so a surface containing a space is multi-token and can
+///   never match a single input token: `zu lieben` (look up `zu` and
+///   `lieben` separately), multiword lemmas (`Sicherheitsrat der
+///   Vereinten Nationen`), `so genannte`, the separated forms of
+///   separable verbs (`tauche ab`). The single-word zu-infinitive of a
+///   separable verb (`abzutauchen`) has no space and is kept.
+/// - **Leaked wikitext/HTML markup** the template parser passed through:
+///   HTML comments (`isometrischer <!--…-->`), `<small>`/`<ref>` tags,
+///   doubled braces/brackets.
+///
+/// Single-bracket punctuation entries (`[`, `]`, `{`, `}`) are kept —
+/// only *doubled* braces/brackets signal markup.
 pub fn is_clean_surface(surface: &str) -> bool {
-    !(surface.contains('<')
+    !(surface.contains(char::is_whitespace)
+        || surface.contains('<')
         || surface.contains('>')
-        || surface.contains('\n')
-        || surface.contains('\r')
-        || surface.contains('\t')
         || surface.contains("{{")
         || surface.contains("}}")
         || surface.contains("[[")
-        || surface.contains("]]")
-        || surface.contains("  "))
+        || surface.contains("]]"))
 }
 
 /// Streaming builder. Records are added in arbitrary order; sorting
@@ -305,19 +308,24 @@ mod tests {
     use crate::lexicon::load::Lexicon;
 
     #[test]
-    fn is_clean_surface_keeps_legit_and_rejects_markup() {
-        // Legit surfaces — incl. zu-infinitives, compounds, multiword
-        // lemmas, and the single-bracket punctuation entries.
+    fn is_clean_surface_keeps_single_tokens_and_rejects_multitoken_and_markup() {
+        // Single-token surfaces — incl. word-internal compounds, the
+        // single-word zu-infinitive of separable verbs, and the
+        // single-bracket punctuation entries.
         for ok in [
-            "Tisch", "groß", "zu lieben", "stilllegen", "so genannte", "[", "]", "{", "}", "...",
+            "Tisch", "groß", "stilllegen", "abzutauchen", "[", "]", "{", "}", "...",
         ] {
             assert!(is_clean_surface(ok), "wrongly rejected {ok:?}");
+        }
+        // Multi-token surfaces (any space) — not analysable as one token.
+        for bad in ["zu lieben", "so genannte", "Sicherheitsrat der Vereinten Nationen", "tauche ab"]
+        {
+            assert!(!is_clean_surface(bad), "failed to reject multi-token {bad:?}");
         }
         // Contaminated surfaces from leaked template markup / whitespace.
         for bad in [
             "isometrischer      <!--laut Duden keine Steigerung-->er",
             "<small>(schneibte)</small>",
-            "tauchte  ab",
             "-ige\n<!--",
             "Foo{{x}}",
             "a[[b]]",
