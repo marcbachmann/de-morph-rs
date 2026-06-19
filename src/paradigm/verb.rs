@@ -375,27 +375,34 @@ fn split_separable<'a>(inputs: &VerbAttested<'a>) -> Option<(&'a str, VerbAttest
         inputs.past_1sg,
         inputs.imperativ_sg,
     ];
-    let particle = candidates
+    // A separated finite form is "base particle[ particle…]" — the base
+    // (first token) is the conjugated verb, and everything after it is the
+    // separated prefix particle(s): "tauche ab" → "ab", "stelle wieder her"
+    // → "wieder her". Concatenated in order the particles form a literal
+    // prefix of the infinitive (abtauchen, wiederherstellen). This also
+    // covers double-prefix verbs and never misfires on inseparable
+    // prefixes (be-/ver-/ent-, whose forms carry no space) or on multiword
+    // lemmas (whose infinitive itself contains spaces, so the space-free
+    // joined prefix can't be a prefix of it).
+    let rest = candidates
         .into_iter()
         .flatten()
-        .find_map(|f| f.rsplit_once(' ').map(|(_, p)| p))?;
+        .find_map(|f| f.split_once(' ').map(|(_, rest)| rest))?;
     let inf = inputs.infinitive;
-    if particle.is_empty() || !inf.starts_with(particle) {
+    let joined: String = rest.split_whitespace().collect();
+    if joined.is_empty() || !inf.starts_with(&joined) {
         return None;
     }
-    let base_inf = &inf[particle.len()..];
+    let base_inf = &inf[joined.len()..];
     if base_inf.len() < 2 || !(base_inf.ends_with("en") || base_inf.ends_with('n')) {
         return None;
     }
-    let prefix = &inf[..particle.len()];
+    let prefix = &inf[..joined.len()];
 
-    // Strip the trailing " {particle}" from a separated finite form.
+    // Strip the separated particles: keep only the base (first token).
     let strip_fin = |f: Option<&'a str>| -> Option<&'a str> {
         let s = f?;
-        match s.strip_suffix(particle) {
-            Some(head) if head.ends_with(' ') => Some(head.trim_end()),
-            _ => Some(s),
-        }
+        Some(s.split_once(' ').map(|(base, _)| base).unwrap_or(s))
     };
     // Partizip II is already joined (abgetaucht); strip the LEADING prefix.
     let base_partizip = inputs
@@ -1056,6 +1063,39 @@ mod tests {
         assert!(has("ausbrach"), "1Sg past");
         assert!(has("ausbrachst"), "2Sg past (ch, no epenthesis)");
         assert!(!has("brach ausst"));
+    }
+
+    #[test]
+    fn separable_double_prefix_verb() {
+        // "wiederherstellen" = wieder + her + stellen. The separated finite
+        // forms carry BOTH particles ("stelle wieder her"); concatenated
+        // they prefix the infinitive. The zu-infinitive inserts -zu- after
+        // the full prefix: "wiederherzustellen".
+        let inputs = VerbAttested {
+            infinitive: "wiederherstellen",
+            present_1sg: Some("stelle wieder her"),
+            present_2sg: Some("stellst wieder her"),
+            present_3sg: Some("stellt wieder her"),
+            past_1sg: Some("stellte wieder her"),
+            konj_ii_1sg: Some("stellte wieder her"),
+            imperativ_sg: Some("stell wieder her"),
+            imperativ_pl: Some("stellt wieder her"),
+            partizip_perf: Some("wiederhergestellt"),
+        };
+        let cells = generate_verb_paradigm(&inputs);
+        assert!(
+            cells.iter().all(|(s, _)| !s.contains(' ')),
+            "must be single-token, got {cells:#?}"
+        );
+        assert!(cells.iter().all(|(_, a)| a.lemma == "wiederherstellen"));
+        let has = |q: &str| cells.iter().any(|(s, _)| s == q);
+        assert!(has("wiederherstellen"), "Inf");
+        assert!(has("wiederherzustellen"), "zu-Inf");
+        assert!(has("wiederherstellend"), "PtcPres");
+        assert!(has("wiederhergestellt"), "PtcPerf");
+        assert!(has("wiederherstelle"), "1Sg");
+        assert!(has("wiederherstellst"), "2Sg");
+        assert!(has("wiederherstellte"), "past 1Sg");
     }
 
     #[test]
