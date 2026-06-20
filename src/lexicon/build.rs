@@ -22,8 +22,8 @@ use crate::analysis::PackedFeatures;
 use crate::analysis::UPOS;
 use crate::analysis::Source;
 use crate::lexicon::format::{
-    pack_fst_value, AnalysisRecord, ANALYSIS_RECORD_SIZE, HEADER_SIZE, MAGIC, VERSION_MAJOR,
-    VERSION_MINOR,
+    pack_fst_value, AnalysisRecord, Shape, ANALYSIS_RECORD_SIZE, HEADER_SIZE, MAGIC, MAX_SHAPE_ID,
+    SHAPE_ENTRY_SIZE, VERSION_MAJOR, VERSION_MINOR,
 };
 
 /// Error returned by [`LexiconBuilder::finish`].
@@ -39,6 +39,8 @@ pub enum BuildError {
     TooManyAnalyses,
     /// A single surface has more than `u32::MAX` analyses.
     TooManyAnalysesPerSurface,
+    /// More distinct analysis shapes than the 12-bit `shape_id` allows.
+    TooManyShapes,
     /// Side-table size exceeds `u32::MAX` bytes.
     SideTableTooLarge,
 }
@@ -53,6 +55,7 @@ impl std::fmt::Display for BuildError {
             Self::TooManyAnalysesPerSurface => {
                 write!(f, "more than u32::MAX analyses for one surface")
             }
+            Self::TooManyShapes => write!(f, "more than 4096 distinct analysis shapes"),
             Self::SideTableTooLarge => write!(f, "side table exceeds 4 GiB"),
         }
     }
@@ -202,36 +205,58 @@ impl LexiconBuilder {
         //   header [HEADER_SIZE bytes]
         //   lemma_offsets [(num_lemmas + 1) * 4 bytes]
         //   lemma_bytes
-        //   analyses [num_analyses * 12 bytes]
-        let lemma_offsets_offset = HEADER_SIZE as u64;
-        let lemma_offsets_bytes = (num_lemmas as u64 + 1) * 4;
-        let lemma_bytes_offset = lemma_offsets_offset + lemma_offsets_bytes;
-        let lemma_total_bytes: u64 = lemmas.iter().map(|s| s.len() as u64).sum();
-        let analyses_offset = lemma_bytes_offset + lemma_total_bytes;
+        //   shape_table [num_shapes * SHAPE_ENTRY_SIZE bytes]
+        //   analyses [num_analyses * ANALYSIS_RECORD_SIZE bytes]
 
-        // Build the analyses block in memory while collecting FST values
-        // by surface.
+        // Build the analyses block, interning each record's (pos, source,
+        // aux, features) tuple into the shape table and storing only a
+        // (lemma_id, shape_id) pair per record. Per-surface byte spans are
+        // recorded relative to the start of the analyses block; absolute
+        // offsets are resolved once the shape-table size is known.
         let mut analyses_bytes: Vec<u8> = Vec::new();
-        let mut fst_entries: Vec<(String, u64)> = Vec::with_capacity(by_surface.len());
+        let mut shape_ids: HashMap<Shape, u16> = HashMap::new();
+        let mut shapes: Vec<Shape> = Vec::new();
+        let mut surface_spans: Vec<(String, u32, u64)> = Vec::with_capacity(by_surface.len());
         for (surface, records) in by_surface {
             let count =
                 u32::try_from(records.len()).map_err(|_| BuildError::TooManyAnalysesPerSurface)?;
             let offset_in_analyses = analyses_bytes.len() as u64;
-            let absolute_offset = analyses_offset + offset_in_analyses;
-            let absolute_offset_u32 =
-                u32::try_from(absolute_offset).map_err(|_| BuildError::SideTableTooLarge)?;
             for rec in records {
-                let on_disk = AnalysisRecord {
-                    lemma_id: rec.lemma_id,
+                let shape = Shape {
+                    packed_features: rec.features.0,
                     pos: rec.pos as u8,
                     source: rec.source as u8,
-                    packed_features: rec.features.0,
                     aux: rec.aux,
+                };
+                let shape_id = match shape_ids.get(&shape) {
+                    Some(&id) => id,
+                    None => {
+                        if shapes.len() as u32 > MAX_SHAPE_ID {
+                            return Err(BuildError::TooManyShapes);
+                        }
+                        let id = shapes.len() as u16;
+                        shapes.push(shape);
+                        shape_ids.insert(shape, id);
+                        id
+                    }
+                };
+                let on_disk = AnalysisRecord {
+                    lemma_id: rec.lemma_id,
+                    shape_id,
                 };
                 analyses_bytes.extend_from_slice(&on_disk.to_bytes());
             }
-            fst_entries.push((surface, pack_fst_value(count, absolute_offset_u32)));
+            surface_spans.push((surface, count, offset_in_analyses));
         }
+        let num_shapes = u32::try_from(shapes.len()).map_err(|_| BuildError::TooManyShapes)?;
+
+        let lemma_offsets_offset = HEADER_SIZE as u64;
+        let lemma_offsets_bytes = (num_lemmas as u64 + 1) * 4;
+        let lemma_bytes_offset = lemma_offsets_offset + lemma_offsets_bytes;
+        let lemma_total_bytes: u64 = lemmas.iter().map(|s| s.len() as u64).sum();
+        let shape_table_offset = lemma_bytes_offset + lemma_total_bytes;
+        let shape_table_bytes = num_shapes as u64 * SHAPE_ENTRY_SIZE as u64;
+        let analyses_offset = shape_table_offset + shape_table_bytes;
 
         let num_analyses = u32::try_from(analyses_bytes.len() / ANALYSIS_RECORD_SIZE)
             .map_err(|_| BuildError::TooManyAnalyses)?;
@@ -240,11 +265,23 @@ impl LexiconBuilder {
             u32::try_from(analyses_end).map_err(|_| BuildError::SideTableTooLarge)?;
         let lemma_offsets_offset_u32 = lemma_offsets_offset as u32;
         let lemma_bytes_offset_u32 = lemma_bytes_offset as u32;
-        let analyses_offset_u32 = analyses_offset as u32;
+        let shape_table_offset_u32 =
+            u32::try_from(shape_table_offset).map_err(|_| BuildError::SideTableTooLarge)?;
+        let analyses_offset_u32 =
+            u32::try_from(analyses_offset).map_err(|_| BuildError::SideTableTooLarge)?;
 
-        // Build the FST. `fst_entries` is already sorted by surface
-        // because the upstream BTreeMap iteration is in lexicographic
-        // order.
+        // Resolve per-surface absolute analysis offsets now that the
+        // shape table size is known. `surface_spans` preserves the
+        // BTreeMap's lexicographic order, so FST insertion stays sorted.
+        let mut fst_entries: Vec<(String, u64)> = Vec::with_capacity(surface_spans.len());
+        for (surface, count, offset_in_analyses) in surface_spans {
+            let absolute_offset = analyses_offset + offset_in_analyses;
+            let absolute_offset_u32 =
+                u32::try_from(absolute_offset).map_err(|_| BuildError::SideTableTooLarge)?;
+            fst_entries.push((surface, pack_fst_value(count, absolute_offset_u32)));
+        }
+
+        // Build the FST.
         let mut fst_builder = MapBuilder::new(&mut fst_out)?;
         for (surface, value) in &fst_entries {
             fst_builder.insert(surface, *value)?;
@@ -264,7 +301,9 @@ impl LexiconBuilder {
         header[32..36].copy_from_slice(&lemma_bytes_offset_u32.to_le_bytes());
         header[36..40].copy_from_slice(&analyses_offset_u32.to_le_bytes());
         header[40..44].copy_from_slice(&analyses_end_u32.to_le_bytes());
-        // bytes 44..64 are reserved (already zeroed).
+        header[44..48].copy_from_slice(&num_shapes.to_le_bytes());
+        header[48..52].copy_from_slice(&shape_table_offset_u32.to_le_bytes());
+        // bytes 52..64 are reserved (already zeroed).
         side_out.write_all(&header)?;
 
         // Lemma offsets: (num_lemmas + 1) * u32, each relative to
@@ -282,6 +321,11 @@ impl LexiconBuilder {
         // Lemma bytes.
         for lemma in &lemmas {
             side_out.write_all(lemma.as_bytes())?;
+        }
+
+        // Shape table.
+        for shape in &shapes {
+            side_out.write_all(&shape.to_bytes())?;
         }
 
         // Analyses.

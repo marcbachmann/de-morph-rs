@@ -14,7 +14,8 @@ use fst::Map as FstMap;
 
 use crate::analysis::{Analysis, Aux, Case, Gender, Number, PackedFeatures, UPOS, Source};
 use crate::lexicon::format::{
-    unpack_fst_value, AnalysisRecord, ANALYSIS_RECORD_SIZE, HEADER_SIZE, MAGIC, VERSION_MAJOR,
+    unpack_fst_value, AnalysisRecord, Shape, ANALYSIS_RECORD_SIZE, HEADER_SIZE, MAGIC,
+    SHAPE_ENTRY_SIZE, VERSION_MAJOR,
 };
 
 /// Errors raised when loading a lexicon.
@@ -38,6 +39,8 @@ pub enum LoadError {
     InvalidPos(u8),
     /// A source byte was outside the known Source enum range.
     InvalidSource(u8),
+    /// A record referenced a shape id beyond the shape table.
+    InvalidShape(u16),
     /// A lemma in the intern table was not valid UTF-8.
     InvalidLemmaUtf8,
 }
@@ -55,6 +58,7 @@ impl std::fmt::Display for LoadError {
             Self::Truncated { field } => write!(f, "truncated side table at {field}"),
             Self::InvalidPos(p) => write!(f, "invalid pos byte: {p}"),
             Self::InvalidSource(s) => write!(f, "invalid source byte: {s}"),
+            Self::InvalidShape(s) => write!(f, "shape id out of range: {s}"),
             Self::InvalidLemmaUtf8 => write!(f, "lemma intern table contains invalid UTF-8"),
         }
     }
@@ -151,6 +155,9 @@ pub struct Lexicon {
     num_lemmas: usize,
     #[allow(dead_code)]
     num_analyses: usize,
+    /// Interned analysis shapes, decoded once at load and indexed by the
+    /// `shape_id` in each record.
+    shapes: Vec<Shape>,
 }
 
 impl Lexicon {
@@ -188,6 +195,9 @@ impl Lexicon {
             u32::from_le_bytes(side_bytes[32..36].try_into().unwrap()) as usize;
         let analyses_offset = u32::from_le_bytes(side_bytes[36..40].try_into().unwrap()) as usize;
         let analyses_end = u32::from_le_bytes(side_bytes[40..44].try_into().unwrap()) as usize;
+        let num_shapes = u32::from_le_bytes(side_bytes[44..48].try_into().unwrap()) as usize;
+        let shape_table_offset =
+            u32::from_le_bytes(side_bytes[48..52].try_into().unwrap()) as usize;
 
         if side_bytes.len() < analyses_end {
             return Err(LoadError::Truncated {
@@ -199,8 +209,20 @@ impl Lexicon {
                 field: "lemma offsets",
             });
         }
+        let shape_table_end = shape_table_offset + num_shapes * SHAPE_ENTRY_SIZE;
+        if shape_table_end > analyses_offset || analyses_offset > side_bytes.len() {
+            return Err(LoadError::Truncated {
+                field: "shape table",
+            });
+        }
 
-        let _ = analyses_offset; // header field; bounds-checked via analyses_end
+        // Decode the shape table once (a few hundred entries).
+        let mut shapes = Vec::with_capacity(num_shapes);
+        for i in 0..num_shapes {
+            let start = shape_table_offset + i * SHAPE_ENTRY_SIZE;
+            shapes.push(Shape::from_bytes(&side_bytes[start..start + SHAPE_ENTRY_SIZE]));
+        }
+
         Ok(Lexicon {
             fst,
             side: side_bytes,
@@ -209,6 +231,7 @@ impl Lexicon {
             analyses_end,
             num_lemmas,
             num_analyses,
+            shapes,
         })
     }
 
@@ -557,10 +580,15 @@ impl Lexicon {
         out
     }
 
-    /// Convert an on-disk record to an [`Analysis`] with the lemma
-    /// looked up from the intern table.
+    /// Convert an on-disk record to an [`Analysis`]: resolve its shape
+    /// from the shape table, then look up the lemma from the intern
+    /// table.
     fn materialise(&self, rec: &AnalysisRecord) -> Result<Analysis, LoadError> {
-        let pos = match rec.pos {
+        let shape = self
+            .shapes
+            .get(rec.shape_id as usize)
+            .ok_or(LoadError::InvalidShape(rec.shape_id))?;
+        let pos = match shape.pos {
             0 => UPOS::NOUN,
             1 => UPOS::VERB,
             2 => UPOS::ADJ,
@@ -580,15 +608,15 @@ impl Lexicon {
             16 => UPOS::PROPN,
             other => return Err(LoadError::InvalidPos(other)),
         };
-        let source = match rec.source {
+        let source = match shape.source {
             0 => Source::Lexicon,
             1 => Source::Generated,
             2 => Source::Guessed,
             other => return Err(LoadError::InvalidSource(other)),
         };
-        let mut features = PackedFeatures(rec.packed_features).unpack();
-        // `aux` rides in the record's reserved bits, not the feature word.
-        features.aux = Aux::from_code(rec.aux);
+        let mut features = PackedFeatures(shape.packed_features).unpack();
+        // `aux` rides in the shape entry, not the PackedFeatures word.
+        features.aux = Aux::from_code(shape.aux);
         let lemma = self.lemma(rec.lemma_id)?;
         Ok(Analysis::with_source(lemma, pos, features, source))
     }
