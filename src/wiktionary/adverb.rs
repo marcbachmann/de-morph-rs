@@ -168,8 +168,8 @@ const PARTICLE_TEMPLATES: &[&str] = &[
 /// appear under both Modalpartikel and Fokuspartikel). We emit only
 /// ONE entry per page — the lemma is the page title and the analysis
 /// is `(UPOS::PART, Features::empty())`. The particle's sub-type
-/// (Modal / Fokus / Antwort / Grad) is not recorded as a feature in
-/// v0 since the Features struct has no dedicated slot for it.
+/// (Modal / Fokus / Antwort / Grad) is not recorded as a feature,
+/// since the Features struct has no dedicated slot for it.
 pub fn extract_particles(title: &str, page_text: &str) -> Vec<ExtractedEntry> {
     if !has_german_particle_section(page_text) {
         return Vec::new();

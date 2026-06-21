@@ -48,10 +48,10 @@ pub fn extract_nouns(title: &str, page_text: &str) -> Vec<ExtractedEntry> {
 ///   - `Deutsch Toponym Übersicht`               — place names
 ///   - `Deutsch adjektivische Deklination`       — substantivised adjectives
 ///
-/// For v0 we accept the common-noun overview and its decorated
-/// variants; given-name / surname / toponym templates produce mostly
-/// the same fields but have additional quirks (no plural for given
-/// names etc.) and will land in their own extractors as we expand.
+/// We accept the common-noun overview and its decorated variants here.
+/// Given-name / surname / toponym templates produce mostly the same
+/// fields but have additional quirks (no plural for given names etc.)
+/// and are out of scope for this matcher.
 fn is_noun_overview_template(name: &str) -> bool {
     let n = name.trim();
     n == "Deutsch Substantiv Übersicht"
@@ -83,11 +83,8 @@ fn extract_one_template(title: &str, tpl: &Template, out: &mut Vec<ExtractedEntr
         .filter_map(|k| tpl.named_arg(k).and_then(parse_gender))
         .collect();
     if genders.is_empty() {
-        // Some lemmas (e.g. pluraliatantum) may legitimately omit Genus;
-        // a tiny fallback lets us still emit forms. The fallback is
-        // marked as gender::Masc but tagged with a feature placeholder —
-        // for v0 we just skip these and revisit when verb extraction
-        // surfaces the same gap.
+        // Some lemmas (e.g. pluraliatantum) may legitimately omit Genus.
+        // We skip them rather than guessing a gender.
         return;
     }
 

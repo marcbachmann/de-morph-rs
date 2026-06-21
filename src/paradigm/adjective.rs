@@ -14,7 +14,7 @@
 //! number of stems, and the FST minimisation collapses the shared
 //! prefixes aggressively.
 //!
-//! Out of scope for v0:
+//! Out of scope:
 //! - Adjectives where the comparative or superlative is suppletive
 //!   (`gut/besser/best`, `viel/mehr/meist`) — the stems are stored
 //!   verbatim from Wiktionary, so suppletives that have a Komparativ

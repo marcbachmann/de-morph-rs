@@ -377,7 +377,7 @@ impl Analyzer {
     /// - Strong verbs whose past stem differs from the present stem
     ///   (e.g. `geben` → `gab`) cannot be recovered from past forms.
     /// - Partizip Perfekt without `ge-` prefix (Latin loans like
-    ///   `studiert`) is not handled in v0.
+    ///   `studiert`) is not handled.
     /// - Separable verbs and reflexives are out of scope.
     fn guess_verb_paradigm_cells(&self, surface: &str) -> Vec<Analysis> {
         let mut out = Vec::new();

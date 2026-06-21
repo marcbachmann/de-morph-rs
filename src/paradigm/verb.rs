@@ -17,14 +17,19 @@
 //! that's OK because the downstream FST builder will collapse
 //! duplicates while keeping multiple analyses per surface.
 //!
-//! Out-of-scope for v0 (documented limitations):
-//! - Separable-prefix verbs ("anfangen") with split conjugation.
-//! - Reflexive verbs.
-//! - True suppletives (sein, haben, werden, tun): the rule-derived
-//!   plural Pres Ind forms will be wrong for these. A small
-//!   closed-class override table is the planned follow-up; for now
-//!   the wrong forms are emitted and tagged `Source::Generated` so a
-//!   later lookup-vs-guess discriminator can identify them.
+//! Handled:
+//! - Separable-prefix verbs ("abtauchen", double-prefix
+//!   "wiederherstellen"): detected data-drivenly and rejoined into
+//!   single-token forms (`split_separable` / `join_separable`).
+//! - True suppletives: the cells the rule layer gets wrong for `sein`
+//!   and `tun` (Pres Ind plural, Konj I, PtcPres) are replaced by a
+//!   curated closed-class table (`SUPPLETIVE_OVERRIDES`), tagged
+//!   `Source::Lexicon`. `haben`/`werden` need no override once their
+//!   attested Wiktionary fields are present.
+//!
+//! Out of scope:
+//! - Reflexive verbs (the reflexive pronoun is a separate token and is
+//!   not generated here).
 //!
 //! References (verified): widely-attested rules of German verb
 //! conjugation; any modern German reference grammar carries them
@@ -165,7 +170,7 @@ pub fn generate_verb_paradigm(inputs: &VerbAttested) -> Vec<VerbCell> {
     // --- Konjunktiv I (Präsens) ------------------------------------------
     // Konj I uses the infinitive stem + Konj-I endings (-e, -est, -e,
     // -en, -et, -en). For irregular verbs (sein → ich sei), this rule
-    // produces wrong forms; the closed-class override TODO covers it.
+    // produces wrong forms; `apply_suppletive_overrides` fixes those cells.
     for (person, number, form) in konj_i_paradigm(&stem) {
         push(
             &mut out,
@@ -316,7 +321,7 @@ const SUPPLETIVE_OVERRIDES: &[(&str, &[OverrideCell])] = &[
     // `haben` and `werden` are already handled correctly by the rule
     // layer once their attested Wiktionary fields are in place
     // (`habst`/`hast`, `wirst`/`wird`, etc. are stored). No override
-    // entries needed for v0.
+    // entries needed for them.
     (
         "tun",
         &[

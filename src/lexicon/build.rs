@@ -7,7 +7,7 @@
 //! Records do not need to be sorted in input order; the builder sorts
 //! by surface internally to satisfy the FST builder's contract. For
 //! very large inputs an external sort would be needed; at ~1.4M
-//! records (the v0 nouns + verbs lexicon) the in-memory sort fits
+//! records (the nouns + verbs lexicon) the in-memory sort fits
 //! comfortably and finishes in under a second.
 
 use std::collections::BTreeMap;

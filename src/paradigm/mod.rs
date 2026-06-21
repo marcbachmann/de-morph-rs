@@ -15,8 +15,8 @@
 //! tag on each returned [`crate::analysis::Analysis`] tells the caller
 //! how much to trust the result.
 //!
-//! Module scope at v0: nouns only. Verbs and adjectives land in
-//! sibling modules as they're written.
+//! Each part of speech lives in its own sibling module: `noun`,
+//! `verb`, `adjective`, and `closed_class`.
 
 pub mod adjective;
 pub mod closed_class;
