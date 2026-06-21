@@ -11,11 +11,13 @@ target/
 /data/**/build/
 /data/**/processed/
 
-# Built lexicon artifacts (FST + side table). Regenerable from
-# data/wiktionary/ via the extractor + build-lexicon binaries; large
-# binaries that would bloat history, so they live on disk untracked.
+# Built lexicon artifacts (FST + side table) and eval diagnostics.
+# Regenerable from data/wiktionary/ via the extractor + build-lexicon
+# binaries; large binaries that would bloat history, so they live on
+# disk untracked.
 /data/lexicon/*.fst
 /data/lexicon/*.dat
+/data/lexicon/*.jsonl
 
 # Editor / OS noise
 .idea/

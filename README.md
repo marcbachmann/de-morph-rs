@@ -22,8 +22,9 @@ license texts live under `LICENSES/`.
 
     Cargo.toml         library manifest (MIT)
     src/               Rust source (MIT)
-    data/              data sources, each with its own PROVENANCE.md
-        wiktionary/    primary lexicon source (CC BY-SA 4.0 when populated)
+    data/              external data + generated build artifacts
+        wiktionary/    lexicon source (CC BY-SA 4.0); see PROVENANCE.md
+        lexicon/       generated FST + side table (gitignored)
     scripts/           reproducible fetch and build scripts
         fetch/         one script per upstream source
     LICENSES/          verbatim third-party license texts
@@ -64,9 +65,10 @@ tag set and the morphological feature inventory.
 The published crate bundles no data (`data/` is excluded from the
 package — see `exclude` in `Cargo.toml`). With no lexicon loaded the
 analyzer still returns best-effort out-of-vocabulary guesses; for real
-coverage, build a lexicon and open it with `Analyzer::open`. A
-Wiktionary-derived lexicon lives under `data/lexicon/` in the repo for
-development and evaluation.
+coverage, build a lexicon and open it with `Analyzer::open`. The
+build-lexicon tooling writes a Wiktionary-derived lexicon to
+`data/lexicon/` (generated; gitignored) for local development and
+evaluation.
 
 ## Contributing
 

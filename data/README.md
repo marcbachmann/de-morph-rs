@@ -22,9 +22,9 @@ Each source declares a `usage` tier in its `PROVENANCE.md`:
   are not derivatives under the source's licence. When in doubt,
   treat as `ship`.
 - `eval-only` — used only to measure quality. **MUST NOT enter the
-  shipped artefact, directly or indirectly.** Lives under
-  `data/eval/` (or carries the `eval-only` tier explicitly) and is
-  reachable only from `tests/eval/` or a dedicated binary target.
+  shipped artefact, directly or indirectly.** Carries the `eval-only`
+  tier explicitly and is reachable only from `tests/eval/` or a
+  dedicated binary target.
 
 ## Current sources
 

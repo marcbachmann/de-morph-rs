@@ -5,7 +5,7 @@
 //!   cargo run --release --example conllu_unmatched_dump -- <corpus_dir>...
 //!
 //! Output:
-//!   `data/eval/unmatched.jsonl` — one record per (surface, gold_lemma,
+//!   `data/lexicon/unmatched.jsonl` — one record per (surface, gold_lemma,
 //!   gold_pos) sorted by count desc. Schema:
 //!     {"pos":"NOUN","surface":"Bröchten","gold_lemma":"Brötchen","count":42,
 //!      "had_any_analysis":true,"reason":"lemma_disagrees"}
@@ -34,7 +34,7 @@ use de_morph::Analyzer;
 
 const FST: &str = "data/lexicon/lexicon.fst";
 const DAT: &str = "data/lexicon/lexicon.dat";
-const OUTPUT: &str = "data/eval/unmatched.jsonl";
+const OUTPUT: &str = "data/lexicon/unmatched.jsonl";
 
 #[derive(Default)]
 struct MissRecord {
