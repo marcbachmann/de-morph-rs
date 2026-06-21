@@ -3,27 +3,19 @@
 German morphological analyzer based on finite-state transducers, written
 in Rust.
 
-Status: **pre-alpha**. The repository contains project scaffolding, an
-attribution discipline, and a working analyzer: FST-backed lexicon
-lookup with fallbacks for Swiss `ss`/`ß` orthography, hyphenated
-compounds, and out-of-vocabulary guessing (noun/verb/adjective
-paradigms). APIs and on-disk formats may still change.
+Status: **pre-alpha**. A working analyzer: FST-backed lexicon lookup
+with fallbacks for Swiss `ss`/`ß` orthography, hyphenated compounds, and
+out-of-vocabulary guessing (noun/verb/adjective paradigms). APIs and
+on-disk formats may still change.
 
-## Licensing model
+## Licensing
 
-This project separates code and data licenses by design.
-
-- **Source code** is licensed under MIT (see `LICENSE-MIT`). Reading
-  papers (open or closed) to implement algorithms is unrestricted —
-  copyright does not cover methods.
-- **Data files** distributed with or referenced by this crate may carry
-  separate licenses. The most likely shipped data layer derives from
-  [German Wiktionary](https://de.wiktionary.org/) (CC BY-SA 4.0);
-  derivatives must remain CC BY-SA 4.0 and ship as a separately-licensed
-  artifact. Commercial users who cannot accept CC BY-SA on a data
-  artifact should use the (planned) "bring your own data" build path.
-
-The authoritative attribution record is `NOTICE`. Verbatim third-party
+Source code is MIT (see `LICENSE-MIT`); the published crate ships no
+data. Any data layer added later derives from [German
+Wiktionary](https://de.wiktionary.org/) and is CC BY-SA 4.0, shipped as
+a separate artifact rather than compiled into the MIT source. No GPL,
+non-commercial, or academic-only source ever enters the shipped
+artifact, even indirectly. `NOTICE` is the attribution record; verbatim
 license texts live under `LICENSES/`.
 
 ## Layout
