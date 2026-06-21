@@ -2,8 +2,8 @@
 
 Reproducible scripts for fetching and building the data layer. Each
 script is deterministic given a fixed upstream snapshot: it downloads
-to a known location, verifies the sha256 recorded in `PROVENANCE.md`,
-and refuses to continue on mismatch.
+to a known location, verifies the sha256 recorded in the source's
+`PROVENANCE.md`, and refuses to continue on mismatch.
 
 ## Layout
 

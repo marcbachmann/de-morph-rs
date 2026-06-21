@@ -4,11 +4,10 @@ German morphological analyzer based on finite-state transducers, written
 in Rust.
 
 Status: **pre-alpha**. The repository contains project scaffolding, an
-attribution discipline, a curated literature index, and a working
-analyzer: FST-backed lexicon lookup with fallbacks for Swiss `ss`/`ß`
-orthography, hyphenated compounds, and out-of-vocabulary guessing
-(noun/verb/adjective paradigms). APIs and on-disk formats may still
-change.
+attribution discipline, and a working analyzer: FST-backed lexicon
+lookup with fallbacks for Swiss `ss`/`ß` orthography, hyphenated
+compounds, and out-of-vocabulary guessing (noun/verb/adjective
+paradigms). APIs and on-disk formats may still change.
 
 ## Licensing model
 
@@ -19,13 +18,13 @@ This project separates code and data licenses by design.
   copyright does not cover methods.
 - **Data files** distributed with or referenced by this crate may carry
   separate licenses. The most likely shipped data layer derives from
-  German Wiktionary (CC BY-SA 4.0); derivatives must remain CC BY-SA 4.0
-  and ship as a separately-licensed artifact. Commercial users who
-  cannot accept CC BY-SA on a data artifact should use the (planned)
-  "bring your own data" build path.
+  [German Wiktionary](https://de.wiktionary.org/) (CC BY-SA 4.0);
+  derivatives must remain CC BY-SA 4.0 and ship as a separately-licensed
+  artifact. Commercial users who cannot accept CC BY-SA on a data
+  artifact should use the (planned) "bring your own data" build path.
 
-Verbatim third-party license texts live under `LICENSES/`. End-user attribution
-text is collected in `NOTICE`.
+The authoritative attribution record is `NOTICE`. Verbatim third-party
+license texts live under `LICENSES/`.
 
 ## Layout
 
@@ -61,6 +60,10 @@ construction will move to [`rustfst`](https://crates.io/crates/rustfst)
 (pure-Rust OpenFST port, MIT/Apache-2.0) for true transducer composition,
 exporting analyzed pairs into the same runtime format.
 
+Design decisions are documented inline in the source. The
+part-of-speech and feature inventories follow
+[Universal Dependencies](https://universaldependencies.org/) — the UPOS
+tag set and the morphological feature inventory.
 
 ## Building
 
@@ -76,6 +79,6 @@ development and evaluation.
 ## Contributing
 
 See `CONTRIBUTING.md` for the data-sourcing policy. Briefly: a new
-source requires a `PROVENANCE.md` in the
-source's data subdirectory, and the verbatim license text in
+source requires a `PROVENANCE.md` in the source's data subdirectory, an
+attribution paragraph in `NOTICE`, and the verbatim license text in
 `LICENSES/` — added *before* any data lands.

@@ -8,7 +8,8 @@ corresponds to a single source and follows the same layout:
         raw/                gitignored — fetched-as-is upstream snapshot
         processed/          versioned, attributed processed outputs
 
-Each `<source-id>` directory carries its own `PROVENANCE.md`.
+`<source-id>` names the source; each subdirectory carries its own
+`PROVENANCE.md` record. (A CI check to enforce this is planned.)
 
 ## Usage tiers
 
@@ -32,6 +33,6 @@ Each source declares a `usage` tier in its `PROVENANCE.md`:
 ## Adding a source
 
 See `CONTRIBUTING.md` at the project root. Order of operations is
-non-negotiable: licence verification, `PROVENANCE.md`, licence
+non-negotiable: licence verification, a `PROVENANCE.md` record, licence
 text in `LICENSES/`, attribution in `NOTICE`, fetch script, then
 finally the data.

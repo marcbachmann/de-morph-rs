@@ -1,6 +1,6 @@
 # LICENSES
 
-Verbatim third-party license texts referenced by this project.
+Verbatim third-party license texts referenced from `NOTICE`.
 
 Each file in this directory is the canonical text of a license that
 applies to a third-party source bundled with or referenced by this

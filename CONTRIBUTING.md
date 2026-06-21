@@ -71,8 +71,8 @@ tampering and to keep the snapshot reproducible.
 
 Reading a paper to learn a method is unrestricted regardless of the
 paper's licence — algorithms are not subject to copyright. Citations
-belong in source comments. Implementations are
-ours, and only ours, end to end.
+belong in source comments. Implementations are ours, and only ours, end
+to end.
 
 ## Eval-only discipline
 

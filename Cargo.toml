@@ -10,8 +10,8 @@ categories = ["text-processing"]
 readme = "README.md"
 
 # data/ may carry CC BY-SA derivatives of German Wiktionary, and scripts/ is
-# the build tooling. Both directories MUST stay out of the published crate so
-# cargo consumers get only MIT-licensed bytes. Verify before any release with:
+# dev-only tooling. Both MUST stay out of the published crate so cargo
+# consumers get only MIT-licensed bytes. Verify before any release with:
 #   cargo package --list | grep -E '^(data|scripts)/'
 exclude = ["data/*", "scripts/*"]
 
