@@ -1,0 +1,11 @@
+# Formatting matches the crate's Rust edition.
+edition = "2021"
+
+# Group imports into one `use` per module path, e.g.
+#   use std::io::{BufRead, BufReader, BufWriter};
+# and keep the std / external-crate / internal blocks separated.
+#
+# Both options are currently unstable, so they only take effect under
+# `cargo +nightly fmt`. Stable `cargo fmt` silently ignores them.
+imports_granularity = "Module"
+group_imports = "StdExternalCrate"
