@@ -18,19 +18,15 @@
 //! ```
 
 use std::fs::File;
-use std::io::BufWriter;
-use std::io::Write;
+use std::io::{BufWriter, Write};
 use std::path::PathBuf;
 use std::time::Instant;
 
-use anyhow::Context;
-use anyhow::Result;
-
+use anyhow::{Context, Result};
 use de_morph::wiktionary::compound::extract_compounds;
 use de_morph::wiktionary::dump::PageReader;
 
-const DEFAULT_INPUT: &str =
-    "data/wiktionary/raw/dewiktionary-20260601-pages-articles.xml.bz2";
+const DEFAULT_INPUT: &str = "data/wiktionary/raw/dewiktionary-20260601-pages-articles.xml.bz2";
 const DEFAULT_OUTPUT: &str = "data/wiktionary/processed/compounds.jsonl";
 const PROGRESS_EVERY: u64 = 200_000;
 

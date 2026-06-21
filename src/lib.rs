@@ -22,6 +22,6 @@ pub mod paradigm;
 #[cfg(feature = "extractor")]
 pub mod wiktionary;
 
-pub use analysis::{Analysis, Features, UPOS, Source};
+pub use analysis::{Analysis, Features, Source, UPOS};
 pub use analyzer::Analyzer;
 pub use lexicon::{Lexicon, LexiconBuilder};

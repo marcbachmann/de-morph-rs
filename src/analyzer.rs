@@ -243,10 +243,7 @@ impl Analyzer {
             return None;
         }
         let lex = self.lexicon.as_ref()?;
-        let positions: Vec<usize> = surface
-            .match_indices('-')
-            .map(|(i, _)| i)
-            .collect();
+        let positions: Vec<usize> = surface.match_indices('-').map(|(i, _)| i).collect();
         // Rightmost-first: German hyphenated nouns are right-headed.
         // For multi-hyphen surfaces like `Eis-Tee-Latte` the rightmost
         // split first asks: is `Eis-Tee` a noun lemma? Usually not. The
@@ -262,8 +259,8 @@ impl Analyzer {
             // LEFT must be a noun or proper-noun lemma. We accept both
             // because compounds like `Volkswagen-Konzern` lead with a
             // PROPN, and `Palmöl-Importe` leads with a common NOUN.
-            let left_is_nominal_lemma = lex.is_lemma_of_pos(left, UPOS::NOUN)
-                || lex.is_lemma_of_pos(left, UPOS::PROPN);
+            let left_is_nominal_lemma =
+                lex.is_lemma_of_pos(left, UPOS::NOUN) || lex.is_lemma_of_pos(left, UPOS::PROPN);
             if !left_is_nominal_lemma {
                 continue;
             }
@@ -277,7 +274,8 @@ impl Analyzer {
             let right_hits = {
                 let direct = lex.analyze(right);
                 if direct.is_empty() && right.contains('-') {
-                    self.analyze_hyphenated(right, depth + 1).unwrap_or_default()
+                    self.analyze_hyphenated(right, depth + 1)
+                        .unwrap_or_default()
                 } else {
                     direct
                 }
@@ -295,7 +293,11 @@ impl Analyzer {
                     continue;
                 }
                 let lemma = format!("{left}-{}", a.lemma);
-                let key = (lemma.clone(), a.pos as u8, PackedFeatures::pack(a.features).0);
+                let key = (
+                    lemma.clone(),
+                    a.pos as u8,
+                    PackedFeatures::pack(a.features).0,
+                );
                 if !seen.insert(key) {
                     continue;
                 }
@@ -535,8 +537,8 @@ fn try_adj_lemma_hypothesis(
     };
     for (form, mut analysis) in generate_adjective_paradigm(&inputs) {
         let match_exact = form == original_surface;
-        let match_capfold = !match_exact
-            && lowercase_first(&form) == lowercase_first(original_surface);
+        let match_capfold =
+            !match_exact && lowercase_first(&form) == lowercase_first(original_surface);
         if !match_exact && !match_capfold {
             continue;
         }
@@ -583,10 +585,7 @@ fn lowercase_first(s: &str) -> String {
 /// shifts subsequent positions, which is why we collect positions
 /// once and apply masks via fresh allocation.
 pub(crate) fn swiss_orthography_variants(surface: &str) -> Vec<String> {
-    let positions: Vec<usize> = surface
-        .match_indices("ss")
-        .map(|(idx, _)| idx)
-        .collect();
+    let positions: Vec<usize> = surface.match_indices("ss").map(|(idx, _)| idx).collect();
     let n = positions.len();
     if n == 0 {
         return Vec::new();
@@ -825,7 +824,7 @@ mod tests {
         // "liebte" — Past Ind 1Sg or 3Sg, Konj II 1Sg or 3Sg of "lieben".
         let analyzer = Analyzer::empty();
         let hits = analyzer.analyze("liebte");
-        use crate::analysis::{Mood, Person, UPOS, Tense, VerbForm};
+        use crate::analysis::{Mood, Person, Tense, VerbForm, UPOS};
         let past_1sg = hits.iter().find(|a| {
             a.pos == UPOS::VERB
                 && a.features.person == Some(Person::P1)
@@ -926,12 +925,22 @@ mod tests {
     fn analyzer_splits_hyphenated_compound() {
         // Palmöl + Importe → lemma "Palmöl-Import", inflection from Importe.
         let mut b = LexiconBuilder::new();
-        b.add("Palmöl", "Palmöl", UPOS::NOUN,
+        b.add(
+            "Palmöl",
+            "Palmöl",
+            UPOS::NOUN,
             Features::noun_form(Gender::Neut, Number::Sg, Case::Nom),
-            Source::Lexicon).unwrap();
-        b.add("Importe", "Import", UPOS::NOUN,
+            Source::Lexicon,
+        )
+        .unwrap();
+        b.add(
+            "Importe",
+            "Import",
+            UPOS::NOUN,
             Features::noun_form(Gender::Masc, Number::Pl, Case::Nom),
-            Source::Lexicon).unwrap();
+            Source::Lexicon,
+        )
+        .unwrap();
         let mut fst = Vec::new();
         let mut side = Vec::new();
         b.finish(&mut fst, &mut side).unwrap();
@@ -954,9 +963,14 @@ mod tests {
         // recurses on the right and constructs the chain.
         let mut b = LexiconBuilder::new();
         for (sur, lem) in [("Eis", "Eis"), ("Tee", "Tee"), ("Latte", "Latte")] {
-            b.add(sur, lem, UPOS::NOUN,
+            b.add(
+                sur,
+                lem,
+                UPOS::NOUN,
                 Features::noun_form(Gender::Fem, Number::Sg, Case::Nom),
-                Source::Lexicon).unwrap();
+                Source::Lexicon,
+            )
+            .unwrap();
         }
         let mut fst = Vec::new();
         let mut side = Vec::new();
@@ -975,8 +989,22 @@ mod tests {
         // compound. With only an Adj entry for "schwarz", the
         // hyphen-split path must NOT fire.
         let mut b = LexiconBuilder::new();
-        b.add("schwarz", "schwarz", UPOS::ADJ, Features::empty(), Source::Lexicon).unwrap();
-        b.add("weiß", "weiß", UPOS::ADJ, Features::empty(), Source::Lexicon).unwrap();
+        b.add(
+            "schwarz",
+            "schwarz",
+            UPOS::ADJ,
+            Features::empty(),
+            Source::Lexicon,
+        )
+        .unwrap();
+        b.add(
+            "weiß",
+            "weiß",
+            UPOS::ADJ,
+            Features::empty(),
+            Source::Lexicon,
+        )
+        .unwrap();
         let mut fst = Vec::new();
         let mut side = Vec::new();
         b.finish(&mut fst, &mut side).unwrap();
@@ -984,7 +1012,10 @@ mod tests {
             .with_oov_fallback(false);
         let hits = analyzer.analyze("schwarz-weiß");
         // Should be empty: schwarz is ADJ, not NOUN, so hyphen-path declines.
-        assert!(hits.is_empty(), "expected no hyphen-split for adj-adj, got {hits:?}");
+        assert!(
+            hits.is_empty(),
+            "expected no hyphen-split for adj-adj, got {hits:?}"
+        );
     }
 
     /// Build an analyzer over `entries` (all tagged `Source::Lexicon`)
@@ -992,7 +1023,8 @@ mod tests {
     fn lexicon_analyzer(entries: &[(&str, &str, UPOS, Features)]) -> Analyzer {
         let mut b = LexiconBuilder::new();
         for &(surface, lemma, pos, features) in entries {
-            b.add(surface, lemma, pos, features, Source::Lexicon).unwrap();
+            b.add(surface, lemma, pos, features, Source::Lexicon)
+                .unwrap();
         }
         let mut fst = Vec::new();
         let mut side = Vec::new();
@@ -1060,8 +1092,10 @@ mod tests {
         )
         .unwrap();
         let pl = Features::noun_form(Gender::Masc, Number::Pl, Case::Nom);
-        b.add("Teile", "Teil", UPOS::NOUN, pl, Source::Lexicon).unwrap();
-        b.add("Teile", "Teil", UPOS::NOUN, pl, Source::Generated).unwrap();
+        b.add("Teile", "Teil", UPOS::NOUN, pl, Source::Lexicon)
+            .unwrap();
+        b.add("Teile", "Teil", UPOS::NOUN, pl, Source::Generated)
+            .unwrap();
         let mut fst = Vec::new();
         let mut side = Vec::new();
         b.finish(&mut fst, &mut side).unwrap();
@@ -1100,7 +1134,11 @@ mod tests {
         ]);
         let hits = analyzer.analyze("Auto-Bahn");
         let compounds: Vec<_> = hits.iter().filter(|a| a.lemma == "Auto-Bahn").collect();
-        assert_eq!(compounds.len(), 2, "expected Nom+Acc compounds, got {hits:?}");
+        assert_eq!(
+            compounds.len(),
+            2,
+            "expected Nom+Acc compounds, got {hits:?}"
+        );
         assert!(compounds.iter().any(|a| a.features.case == Some(Case::Nom)));
         assert!(compounds.iter().any(|a| a.features.case == Some(Case::Acc)));
     }
@@ -1135,7 +1173,9 @@ mod tests {
             .with_swiss_orthography(true);
         let hits = analyzer.analyze("heisst");
         assert!(!hits.is_empty(), "Swiss-orthography fallback failed");
-        assert!(hits.iter().any(|h| h.lemma == "heißen" && h.pos == UPOS::VERB));
+        assert!(hits
+            .iter()
+            .any(|h| h.lemma == "heißen" && h.pos == UPOS::VERB));
     }
 
     #[test]

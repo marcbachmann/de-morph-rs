@@ -7,22 +7,18 @@
 //! long tail (the dominant class for German abbreviations).
 
 use std::fs::File;
-use std::io::BufWriter;
-use std::io::Write;
+use std::io::{BufWriter, Write};
 use std::path::PathBuf;
 use std::time::Instant;
 
-use anyhow::Context;
-use anyhow::Result;
-use serde::Serialize;
-
+use anyhow::{Context, Result};
 use de_morph::analysis::UPOS;
-use de_morph::wiktionary::ExtractedEntry;
 use de_morph::wiktionary::abbreviation::extract_abbreviations;
 use de_morph::wiktionary::dump::PageReader;
+use de_morph::wiktionary::ExtractedEntry;
+use serde::Serialize;
 
-const DEFAULT_INPUT: &str =
-    "data/wiktionary/raw/dewiktionary-20260601-pages-articles.xml.bz2";
+const DEFAULT_INPUT: &str = "data/wiktionary/raw/dewiktionary-20260601-pages-articles.xml.bz2";
 const DEFAULT_OUTPUT: &str = "data/wiktionary/processed/abbreviations.jsonl";
 const PROGRESS_EVERY: u64 = 200_000;
 

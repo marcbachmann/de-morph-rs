@@ -15,12 +15,10 @@
 //!   <https://docs.rs/quick-xml/0.36/quick_xml/reader/struct.Reader.html>
 
 use std::fs::File;
-use std::io::BufRead;
-use std::io::BufReader;
+use std::io::{BufRead, BufReader};
 use std::path::Path;
 
-use anyhow::Context;
-use anyhow::Result;
+use anyhow::{Context, Result};
 use bzip2::read::MultiBzDecoder;
 use quick_xml::events::Event;
 use quick_xml::reader::Reader;
@@ -187,8 +185,9 @@ impl<R: BufRead> Iterator for PageReader<R> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::io::Cursor;
+
+    use super::*;
 
     const SAMPLE: &str = r#"<mediawiki>
   <page>

@@ -48,15 +48,34 @@ struct Tally {
 /// dropped from the clean denominator.
 const NOISE_PARTS: &[&str] = &[
     // POS labels
-    "nomen", "substantiv", "präposition", "adjektiv", "verb", "adverb",
-    "artikel", "pronomen", "numerale", "konjunktion", "partikel",
-    "interjektion", "zahlwort",
+    "nomen",
+    "substantiv",
+    "präposition",
+    "adjektiv",
+    "verb",
+    "adverb",
+    "artikel",
+    "pronomen",
+    "numerale",
+    "konjunktion",
+    "partikel",
+    "interjektion",
+    "zahlwort",
     // grammatical-feature / register words
-    "feminin", "maskulin", "neutrum", "femininum", "maskulinum",
-    "singular", "plural", "rechtssprache",
+    "feminin",
+    "maskulin",
+    "neutrum",
+    "femininum",
+    "maskulinum",
+    "singular",
+    "plural",
+    "rechtssprache",
     // grammar-process labels (deverbal/derivation terms, never used as
     // a compound constituent in this data)
-    "substantiviert", "substantiven", "substantivierung", "verbstamm",
+    "substantiviert",
+    "substantiven",
+    "substantivierung",
+    "verbstamm",
     "konversion",
 ];
 
@@ -216,8 +235,11 @@ fn pull_optional_string(line: &str, key: &str) -> Option<String> {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let lex = Lexicon::open(FST, DAT)?;
-    eprintln!("Lexicon: {} lemmas, {} surfaces",
-              lex.num_lemmas(), lex.num_surfaces());
+    eprintln!(
+        "Lexicon: {} lemmas, {} surfaces",
+        lex.num_lemmas(),
+        lex.num_surfaces()
+    );
     eprintln!("Reading {COMPOUNDS}");
     let file = File::open(COMPOUNDS)?;
     let reader = BufReader::new(file);
@@ -230,7 +252,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     for line in reader.lines() {
         let line = line?;
-        let Some(rec) = parse_jsonl_line(&line) else { continue };
+        let Some(rec) = parse_jsonl_line(&line) else {
+            continue;
+        };
         // Only evaluate against Determinativ compounds; the others are
         // too few and have idiosyncratic structures (Possessivkompositum
         // attaches a suffix like -chen rather than another noun).
@@ -298,11 +322,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if splits.is_empty() {
             tally.splitter_no_split += 1;
             if sample_no_split.len() < 20 {
-                sample_no_split.push(format!(
-                    "{} ({})",
-                    rec.lemma,
-                    rec.parts.join("+")
-                ));
+                sample_no_split.push(format!("{} ({})", rec.lemma, rec.parts.join("+")));
             }
             continue;
         }
@@ -320,11 +340,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             tally.top1_parts_set_matches += 1;
         }
         if !order_eq && sample_disagreement.len() < 20 {
-            sample_disagreement.push((
-                rec.lemma.clone(),
-                rec.parts.clone(),
-                top.parts.clone(),
-            ));
+            sample_disagreement.push((rec.lemma.clone(), rec.parts.clone(), top.parts.clone()));
         }
 
         // Top-5 set match.
@@ -360,45 +376,74 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     eprintln!("Compared {} compounds in {:.1}s", tally.total, elapsed);
 
     let pct = |n: u64, d: u64| {
-        if d == 0 { 0.0 } else { 100.0 * n as f64 / d as f64 }
+        if d == 0 {
+            0.0
+        } else {
+            100.0 * n as f64 / d as f64
+        }
     };
 
     println!("\n=== Splitter vs. Wiktionary ground truth ===");
     println!("  Compounds evaluated:               {}", tally.total);
-    println!("  No split returned (splitter miss): {} ({:.1}%)",
-             tally.splitter_no_split,
-             pct(tally.splitter_no_split, tally.total));
+    println!(
+        "  No split returned (splitter miss): {} ({:.1}%)",
+        tally.splitter_no_split,
+        pct(tally.splitter_no_split, tally.total)
+    );
 
     let with_split = tally.total - tally.splitter_no_split;
     println!("\n  Of the {} compounds the splitter handled:", with_split);
-    println!("  Top-1 parts (exact order):         {} ({:.1}%)",
-             tally.top1_parts_order_matches,
-             pct(tally.top1_parts_order_matches, with_split));
-    println!("  Top-1 parts (any order):           {} ({:.1}%)",
-             tally.top1_parts_set_matches,
-             pct(tally.top1_parts_set_matches, with_split));
-    println!("  Top-5 parts (any-of-top-5 match):  {} ({:.1}%)",
-             tally.top5_parts_set_matches,
-             pct(tally.top5_parts_set_matches, with_split));
+    println!(
+        "  Top-1 parts (exact order):         {} ({:.1}%)",
+        tally.top1_parts_order_matches,
+        pct(tally.top1_parts_order_matches, with_split)
+    );
+    println!(
+        "  Top-1 parts (any order):           {} ({:.1}%)",
+        tally.top1_parts_set_matches,
+        pct(tally.top1_parts_set_matches, with_split)
+    );
+    println!(
+        "  Top-5 parts (any-of-top-5 match):  {} ({:.1}%)",
+        tally.top5_parts_set_matches,
+        pct(tally.top5_parts_set_matches, with_split)
+    );
 
     println!("\n  Fugenelement agreement (only counted when Wiktionary explicitly annotates one):");
-    println!("    Linker match: {}/{} ({:.1}%)",
-             tally.fugenelement_match,
-             tally.fugenelement_total,
-             pct(tally.fugenelement_match, tally.fugenelement_total));
+    println!(
+        "    Linker match: {}/{} ({:.1}%)",
+        tally.fugenelement_match,
+        tally.fugenelement_total,
+        pct(tally.fugenelement_match, tally.fugenelement_total)
+    );
 
     println!("\n=== Lemma-normalized + noise-filtered (true boundary accuracy) ===");
-    println!("  Noisy gold records skipped (label):{}", tally.noise_skipped);
-    println!("  Gold records skipped (gloss leak): {}", tally.gloss_skipped);
+    println!(
+        "  Noisy gold records skipped (label):{}",
+        tally.noise_skipped
+    );
+    println!(
+        "  Gold records skipped (gloss leak): {}",
+        tally.gloss_skipped
+    );
     println!("  Clean compounds evaluated:         {}", tally.clean_total);
     let clean_handled = tally.clean_total - tally.clean_no_split;
-    println!("  No split returned (clean):         {} ({:.1}%)",
-             tally.clean_no_split, pct(tally.clean_no_split, tally.clean_total));
+    println!(
+        "  No split returned (clean):         {} ({:.1}%)",
+        tally.clean_no_split,
+        pct(tally.clean_no_split, tally.clean_total)
+    );
     println!("\n  Of the {clean_handled} clean compounds the splitter handled:");
-    println!("  Top-1 lemma match (boundary OK):   {} ({:.1}%)",
-             tally.clean_lemma_top1, pct(tally.clean_lemma_top1, clean_handled));
-    println!("  Top-5 lemma match:                 {} ({:.1}%)",
-             tally.clean_lemma_top5, pct(tally.clean_lemma_top5, clean_handled));
+    println!(
+        "  Top-1 lemma match (boundary OK):   {} ({:.1}%)",
+        tally.clean_lemma_top1,
+        pct(tally.clean_lemma_top1, clean_handled)
+    );
+    println!(
+        "  Top-5 lemma match:                 {} ({:.1}%)",
+        tally.clean_lemma_top5,
+        pct(tally.clean_lemma_top5, clean_handled)
+    );
 
     println!("\nExamples — splitter returned no split:");
     for s in &sample_no_split[..sample_no_split.len().min(10)] {

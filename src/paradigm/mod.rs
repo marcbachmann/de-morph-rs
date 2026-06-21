@@ -23,10 +23,10 @@ pub mod closed_class;
 pub mod noun;
 pub mod verb;
 
-pub use adjective::{AdjectiveAttested, generate_adjective_paradigm};
+pub use adjective::{generate_adjective_paradigm, AdjectiveAttested};
 pub use closed_class::generate_closed_class_entries;
 pub use noun::{
-    Confidence, NounClass, NounGuess, default_plural_guess, generate_noun_paradigm, guess_noun,
-    predict_dative_forms,
+    default_plural_guess, generate_noun_paradigm, guess_noun, predict_dative_forms, Confidence,
+    NounClass, NounGuess,
 };
-pub use verb::{VerbAttested, generate_verb_paradigm};
+pub use verb::{generate_verb_paradigm, VerbAttested};

@@ -6,29 +6,18 @@
 //! person/tense/mood/form for finite forms.
 
 use std::fs::File;
-use std::io::BufWriter;
-use std::io::Write;
+use std::io::{BufWriter, Write};
 use std::path::PathBuf;
 use std::time::Instant;
 
-use anyhow::Context;
-use anyhow::Result;
-use serde::Serialize;
-
-use de_morph::analysis::Aux;
-use de_morph::analysis::Mood;
-use de_morph::analysis::Number;
-use de_morph::analysis::Person;
-use de_morph::analysis::UPOS;
-use de_morph::analysis::Source;
-use de_morph::analysis::Tense;
-use de_morph::analysis::VerbForm;
-use de_morph::wiktionary::ExtractedEntry;
+use anyhow::{Context, Result};
+use de_morph::analysis::{Aux, Mood, Number, Person, Source, Tense, VerbForm, UPOS};
 use de_morph::wiktionary::dump::PageReader;
 use de_morph::wiktionary::verb::extract_verbs;
+use de_morph::wiktionary::ExtractedEntry;
+use serde::Serialize;
 
-const DEFAULT_INPUT: &str =
-    "data/wiktionary/raw/dewiktionary-20260601-pages-articles.xml.bz2";
+const DEFAULT_INPUT: &str = "data/wiktionary/raw/dewiktionary-20260601-pages-articles.xml.bz2";
 const DEFAULT_OUTPUT: &str = "data/wiktionary/processed/verbs.jsonl";
 const PROGRESS_EVERY: u64 = 100_000;
 
@@ -165,17 +154,11 @@ fn parse_args() -> Result<Args> {
         match argv[i].as_str() {
             "--input" => {
                 i += 1;
-                input = argv
-                    .get(i)
-                    .context("--input requires a value")?
-                    .into();
+                input = argv.get(i).context("--input requires a value")?.into();
             }
             "--output" => {
                 i += 1;
-                output = argv
-                    .get(i)
-                    .context("--output requires a value")?
-                    .into();
+                output = argv.get(i).context("--output requires a value")?.into();
             }
             "--limit" => {
                 i += 1;

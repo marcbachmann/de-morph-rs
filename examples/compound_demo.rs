@@ -9,11 +9,11 @@ const COMPOUNDS: &[&str] = &[
     "Lehrerzimmer",
     "Buchhandlung",
     "Wassermelone",
-    "Bundestag",         // expects linker -es-
+    "Bundestag", // expects linker -es-
     "Hausarbeit",
     "Schreibtischlampe", // 3-part: Schreib + Tisch + Lampe
     "Wörterbuch",
-    "Donaudampfschiff",  // expects 3 parts: Donau + Dampf + Schiff
+    "Donaudampfschiff", // expects 3 parts: Donau + Dampf + Schiff
 ];
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

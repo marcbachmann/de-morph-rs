@@ -29,23 +29,23 @@ use de_morph::Analyzer;
 
 const SAMPLES: &[&str] = &[
     // Noun forms
-    "Tisch",        // expected: Nom/Dat/Acc Sg masc
-    "Tisches",      // expected: Gen Sg masc
-    "Tischen",      // expected: Dat Pl masc
-    "Frauen",       // expected: all four Pl cases of Frau
-    "Bücher",       // expected: Nom/Gen/Acc Pl neut of Buch
-    "Büchern",      // expected: Dat Pl neut of Buch
+    "Tisch",   // expected: Nom/Dat/Acc Sg masc
+    "Tisches", // expected: Gen Sg masc
+    "Tischen", // expected: Dat Pl masc
+    "Frauen",  // expected: all four Pl cases of Frau
+    "Bücher",  // expected: Nom/Gen/Acc Pl neut of Buch
+    "Büchern", // expected: Dat Pl neut of Buch
     // Verb forms
-    "lieben",       // expected: Inf + 1/3 Pl Pres Ind + 1 Pl Konj I + 3 Pl Konj I
-    "liebte",       // expected: 1/3 Sg Past Ind + 1/3 Sg Konj II
-    "liebtest",     // expected: 2 Sg Past Ind + 2 Sg Konj II
-    "geliebt",      // expected: PtcPerf
-    "war",          // expected: 1/3 Sg Past Ind of sein
+    "lieben",   // expected: Inf + 1/3 Pl Pres Ind + 1 Pl Konj I + 3 Pl Konj I
+    "liebte",   // expected: 1/3 Sg Past Ind + 1/3 Sg Konj II
+    "liebtest", // expected: 2 Sg Past Ind + 2 Sg Konj II
+    "geliebt",  // expected: PtcPerf
+    "war",      // expected: 1/3 Sg Past Ind of sein
     // Adjective forms
-    "groß",         // expected: predicative Pos
-    "größer",       // expected: predicative Cmp; AND Sg Nom Masc Strong of comparative
-    "großen",       // expected: many cells (Dat Pl, Acc Sg Masc, Sg Gen/Dat M+N, ...)
-    "größte",       // expected: Sup attributive
+    "groß",   // expected: predicative Pos
+    "größer", // expected: predicative Cmp; AND Sg Nom Masc Strong of comparative
+    "großen", // expected: many cells (Dat Pl, Acc Sg Masc, Sg Gen/Dat M+N, ...)
+    "größte", // expected: Sup attributive
     // OOV — these are unlikely to be in Wiktionary
     "Quitschung",   // expected: Guessed (-ung → Fem Strong)
     "Quitschungen", // OOV Dat Pl recovery via suffix-strip
@@ -142,9 +142,7 @@ fn analyze_showcase(analyzer: &Analyzer) {
 fn analyze_sentence(analyzer: &Analyzer, sentence: &str) {
     println!("Input: {sentence:?}\n");
     for raw in sentence.split_whitespace() {
-        let token = raw.trim_matches(|c: char| {
-            c.is_ascii_punctuation() && c != '-' && c != '\''
-        });
+        let token = raw.trim_matches(|c: char| c.is_ascii_punctuation() && c != '-' && c != '\'');
         if token.is_empty() {
             continue;
         }

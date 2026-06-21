@@ -20,10 +20,9 @@
 //!   (`lieben`, `sein`, `klieben`) sampled from the 20260601 dump.
 
 use crate::analysis::{Aux, UPOS};
-use crate::paradigm::verb::{VerbAttested, generate_verb_paradigm};
+use crate::paradigm::verb::{generate_verb_paradigm, VerbAttested};
+use crate::wiktionary::template::{find_templates, Template};
 use crate::wiktionary::ExtractedEntry;
-use crate::wiktionary::template::Template;
-use crate::wiktionary::template::find_templates;
 
 /// Extract all verb analyses (full paradigm) from a Wiktionary page.
 pub fn extract_verbs(title: &str, page_text: &str) -> Vec<ExtractedEntry> {

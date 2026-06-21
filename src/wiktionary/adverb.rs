@@ -18,7 +18,7 @@
 //!   POS heading contains `{{Wortart|Adverb|Deutsch}}` is treated as
 //!   having a German adverb sense.
 
-use crate::analysis::{Features, UPOS, PronType, Source};
+use crate::analysis::{Features, PronType, Source, UPOS};
 use crate::wiktionary::ExtractedEntry;
 
 /// Return one `ExtractedEntry` per German adverb section found in

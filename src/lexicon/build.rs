@@ -10,17 +10,12 @@
 //! records (the nouns + verbs lexicon) the in-memory sort fits
 //! comfortably and finishes in under a second.
 
-use std::collections::BTreeMap;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::io::Write;
 
 use fst::MapBuilder;
 
-use crate::analysis::Aux;
-use crate::analysis::Features;
-use crate::analysis::PackedFeatures;
-use crate::analysis::UPOS;
-use crate::analysis::Source;
+use crate::analysis::{Aux, Features, PackedFeatures, Source, UPOS};
 use crate::lexicon::format::{
     pack_fst_value, AnalysisRecord, Shape, ANALYSIS_RECORD_SIZE, HEADER_SIZE, MAGIC, MAX_SHAPE_ID,
     SHAPE_ENTRY_SIZE, VERSION_MAJOR, VERSION_MINOR,
@@ -364,14 +359,29 @@ mod tests {
         // single-word zu-infinitive of separable verbs, and the
         // single-bracket punctuation entries.
         for ok in [
-            "Tisch", "groß", "stilllegen", "abzutauchen", "[", "]", "{", "}", "...",
+            "Tisch",
+            "groß",
+            "stilllegen",
+            "abzutauchen",
+            "[",
+            "]",
+            "{",
+            "}",
+            "...",
         ] {
             assert!(is_clean_surface(ok), "wrongly rejected {ok:?}");
         }
         // Multi-token surfaces (any space) — not analysable as one token.
-        for bad in ["zu lieben", "so genannte", "Sicherheitsrat der Vereinten Nationen", "tauche ab"]
-        {
-            assert!(!is_clean_surface(bad), "failed to reject multi-token {bad:?}");
+        for bad in [
+            "zu lieben",
+            "so genannte",
+            "Sicherheitsrat der Vereinten Nationen",
+            "tauche ab",
+        ] {
+            assert!(
+                !is_clean_surface(bad),
+                "failed to reject multi-token {bad:?}"
+            );
         }
         // Contaminated surfaces from leaked template markup / whitespace.
         for bad in [

@@ -1,22 +1,18 @@
 //! Extract German adverbs (page-title lemmas) from a Wiktionary dump.
 
 use std::fs::File;
-use std::io::BufWriter;
-use std::io::Write;
+use std::io::{BufWriter, Write};
 use std::path::PathBuf;
 use std::time::Instant;
 
-use anyhow::Context;
-use anyhow::Result;
-use serde::Serialize;
-
+use anyhow::{Context, Result};
 use de_morph::analysis::PronType;
-use de_morph::wiktionary::ExtractedEntry;
 use de_morph::wiktionary::adverb::extract_adverbs;
 use de_morph::wiktionary::dump::PageReader;
+use de_morph::wiktionary::ExtractedEntry;
+use serde::Serialize;
 
-const DEFAULT_INPUT: &str =
-    "data/wiktionary/raw/dewiktionary-20260601-pages-articles.xml.bz2";
+const DEFAULT_INPUT: &str = "data/wiktionary/raw/dewiktionary-20260601-pages-articles.xml.bz2";
 const DEFAULT_OUTPUT: &str = "data/wiktionary/processed/adverbs.jsonl";
 const PROGRESS_EVERY: u64 = 200_000;
 
@@ -64,17 +60,11 @@ fn main() -> Result<()> {
         match argv[i].as_str() {
             "--input" => {
                 i += 1;
-                input = argv
-                    .get(i)
-                    .context("--input requires a value")?
-                    .into();
+                input = argv.get(i).context("--input requires a value")?.into();
             }
             "--output" => {
                 i += 1;
-                output = argv
-                    .get(i)
-                    .context("--output requires a value")?
-                    .into();
+                output = argv.get(i).context("--output requires a value")?.into();
             }
             "--help" | "-h" => {
                 eprintln!("extract-adverbs [--input PATH] [--output PATH]");

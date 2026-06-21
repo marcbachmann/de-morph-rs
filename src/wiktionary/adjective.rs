@@ -13,8 +13,7 @@
 
 use crate::analysis::UPOS;
 use crate::paradigm::adjective::{generate_adjective_paradigm, AdjectiveAttested};
-use crate::wiktionary::template::find_templates;
-use crate::wiktionary::template::Template;
+use crate::wiktionary::template::{find_templates, Template};
 use crate::wiktionary::ExtractedEntry;
 
 /// Extract all adjective analyses from a Wiktionary page.

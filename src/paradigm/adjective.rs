@@ -33,9 +33,7 @@
 //!   morphology; the maintainer did not consult a specific reference
 //!   grammar while writing this file.
 
-use crate::analysis::{
-    Analysis, Case, Declension, Degree, Features, Gender, Number, UPOS, Source,
-};
+use crate::analysis::{Analysis, Case, Declension, Degree, Features, Gender, Number, Source, UPOS};
 
 /// The Wiktionary-attested forms for one adjective.
 #[derive(Debug, Clone, Default)]
@@ -240,7 +238,21 @@ fn elide_unstressed_medial_e(stem: &str) -> Option<String> {
 fn is_german_vowel(c: char) -> bool {
     matches!(
         c,
-        'a' | 'e' | 'i' | 'o' | 'u' | 'ä' | 'ö' | 'ü' | 'A' | 'E' | 'I' | 'O' | 'U' | 'Ä' | 'Ö' | 'Ü'
+        'a' | 'e'
+            | 'i'
+            | 'o'
+            | 'u'
+            | 'ä'
+            | 'ö'
+            | 'ü'
+            | 'A'
+            | 'E'
+            | 'I'
+            | 'O'
+            | 'U'
+            | 'Ä'
+            | 'Ö'
+            | 'Ü'
     )
 }
 
@@ -391,12 +403,30 @@ mod tests {
                 Some(g),
             )
         };
-        assert_eq!(strong_pos(Case::Nom, Number::Sg, Gender::Masc), vec!["großer"]);
-        assert_eq!(strong_pos(Case::Nom, Number::Sg, Gender::Fem), vec!["große"]);
-        assert_eq!(strong_pos(Case::Nom, Number::Sg, Gender::Neut), vec!["großes"]);
-        assert_eq!(strong_pos(Case::Dat, Number::Sg, Gender::Masc), vec!["großem"]);
-        assert_eq!(strong_pos(Case::Gen, Number::Pl, Gender::Masc), vec!["großer"]);
-        assert_eq!(strong_pos(Case::Dat, Number::Pl, Gender::Masc), vec!["großen"]);
+        assert_eq!(
+            strong_pos(Case::Nom, Number::Sg, Gender::Masc),
+            vec!["großer"]
+        );
+        assert_eq!(
+            strong_pos(Case::Nom, Number::Sg, Gender::Fem),
+            vec!["große"]
+        );
+        assert_eq!(
+            strong_pos(Case::Nom, Number::Sg, Gender::Neut),
+            vec!["großes"]
+        );
+        assert_eq!(
+            strong_pos(Case::Dat, Number::Sg, Gender::Masc),
+            vec!["großem"]
+        );
+        assert_eq!(
+            strong_pos(Case::Gen, Number::Pl, Gender::Masc),
+            vec!["großer"]
+        );
+        assert_eq!(
+            strong_pos(Case::Dat, Number::Pl, Gender::Masc),
+            vec!["großen"]
+        );
     }
 
     #[test]
@@ -415,9 +445,15 @@ mod tests {
         assert_eq!(weak_pos(Case::Nom, Number::Sg, Gender::Masc), vec!["große"]);
         assert_eq!(weak_pos(Case::Nom, Number::Sg, Gender::Fem), vec!["große"]);
         assert_eq!(weak_pos(Case::Nom, Number::Sg, Gender::Neut), vec!["große"]);
-        assert_eq!(weak_pos(Case::Acc, Number::Sg, Gender::Masc), vec!["großen"]);
+        assert_eq!(
+            weak_pos(Case::Acc, Number::Sg, Gender::Masc),
+            vec!["großen"]
+        );
         assert_eq!(weak_pos(Case::Acc, Number::Sg, Gender::Fem), vec!["große"]);
-        assert_eq!(weak_pos(Case::Dat, Number::Pl, Gender::Masc), vec!["großen"]);
+        assert_eq!(
+            weak_pos(Case::Dat, Number::Pl, Gender::Masc),
+            vec!["großen"]
+        );
     }
 
     #[test]
@@ -456,9 +492,18 @@ mod tests {
             )
         };
         // "größer" + "er" Strong Sg Nom Masc.
-        assert_eq!(cmp_strong(Case::Nom, Number::Sg, Gender::Masc), vec!["größerer"]);
-        assert_eq!(cmp_strong(Case::Nom, Number::Sg, Gender::Fem), vec!["größere"]);
-        assert_eq!(cmp_strong(Case::Dat, Number::Pl, Gender::Masc), vec!["größeren"]);
+        assert_eq!(
+            cmp_strong(Case::Nom, Number::Sg, Gender::Masc),
+            vec!["größerer"]
+        );
+        assert_eq!(
+            cmp_strong(Case::Nom, Number::Sg, Gender::Fem),
+            vec!["größere"]
+        );
+        assert_eq!(
+            cmp_strong(Case::Dat, Number::Pl, Gender::Masc),
+            vec!["größeren"]
+        );
     }
 
     #[test]
@@ -475,9 +520,15 @@ mod tests {
             )
         };
         // "größten" - "en" = "größt"; + "e" Weak Sg Nom = "größte".
-        assert_eq!(sup_weak(Case::Nom, Number::Sg, Gender::Masc), vec!["größte"]);
+        assert_eq!(
+            sup_weak(Case::Nom, Number::Sg, Gender::Masc),
+            vec!["größte"]
+        );
         assert_eq!(sup_weak(Case::Nom, Number::Sg, Gender::Fem), vec!["größte"]);
-        assert_eq!(sup_weak(Case::Dat, Number::Pl, Gender::Masc), vec!["größten"]);
+        assert_eq!(
+            sup_weak(Case::Dat, Number::Pl, Gender::Masc),
+            vec!["größten"]
+        );
         // Strong Sg Nom Neut: "größtes".
         let sup_strong = |c, n, g| {
             find(
@@ -489,7 +540,10 @@ mod tests {
                 Some(g),
             )
         };
-        assert_eq!(sup_strong(Case::Nom, Number::Sg, Gender::Neut), vec!["größtes"]);
+        assert_eq!(
+            sup_strong(Case::Nom, Number::Sg, Gender::Neut),
+            vec!["größtes"]
+        );
     }
 
     #[test]
@@ -502,11 +556,9 @@ mod tests {
         let cells = generate_adjective_paradigm(&inputs);
         // 1 predicative + 72 attributive = 73 cells.
         assert_eq!(cells.len(), 73);
-        assert!(
-            cells
-                .iter()
-                .all(|(_, a)| a.features.degree == Some(Degree::Pos))
-        );
+        assert!(cells
+            .iter()
+            .all(|(_, a)| a.features.degree == Some(Degree::Pos)));
     }
 
     #[test]
@@ -607,7 +659,10 @@ mod tests {
         }
 
         // Predicative positive keeps the full stem.
-        assert_eq!(find(&cells, Degree::Pos, None, None, None, None), vec!["dunkel"]);
+        assert_eq!(
+            find(&cells, Degree::Pos, None, None, None, None),
+            vec!["dunkel"]
+        );
 
         // Comparative must NOT be elided by the -er rule: "dunkler" + "e"
         // = "dunklere", not "dunkle".
@@ -690,7 +745,10 @@ mod tests {
         for bad in ["rosae", "rosaer", "rosaes", "rosaem", "rosaen"] {
             assert!(!surfaces.contains(&bad), "over-generated invalid {bad:?}");
         }
-        assert_eq!(find(&cells, Degree::Pos, None, None, None, None), vec!["rosa"]);
+        assert_eq!(
+            find(&cells, Degree::Pos, None, None, None, None),
+            vec!["rosa"]
+        );
     }
 
     #[test]
@@ -722,7 +780,10 @@ mod tests {
         for bad in ["hoche", "hocher", "hoches", "hochem", "hochen"] {
             assert!(!surfaces.contains(&bad), "over-generated invalid {bad:?}");
         }
-        assert_eq!(find(&cells, Degree::Pos, None, None, None, None), vec!["hoch"]);
+        assert_eq!(
+            find(&cells, Degree::Pos, None, None, None, None),
+            vec!["hoch"]
+        );
     }
 
     #[test]
@@ -797,7 +858,9 @@ mod tests {
             );
             assert_eq!(fem_nom, vec![format!("{lemma}e")], "{lemma}");
             assert!(
-                !cells.iter().any(|(s, _)| s == &lemma.replace("fidel", "fidl")),
+                !cells
+                    .iter()
+                    .any(|(s, _)| s == &lemma.replace("fidel", "fidl")),
                 "wrongly elided {lemma}"
             );
         }

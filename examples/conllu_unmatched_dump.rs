@@ -81,7 +81,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Sort by count desc; tie-break by surface to keep output deterministic.
     let mut sorted: Vec<((String, String, String), MissRecord)> = misses.into_iter().collect();
-    sorted.sort_by(|a, b| b.1.count.cmp(&a.1.count).then_with(|| a.0.0.cmp(&b.0.0)));
+    sorted.sort_by(|a, b| b.1.count.cmp(&a.1.count).then_with(|| a.0 .0.cmp(&b.0 .0)));
 
     if let Some(parent) = Path::new(OUTPUT).parent() {
         fs::create_dir_all(parent)?;
@@ -121,7 +121,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
     let mut by_pos_v: Vec<_> = by_pos.into_iter().collect();
-    by_pos_v.sort_by(|a, b| b.1.1.cmp(&a.1.1));
+    by_pos_v.sort_by(|a, b| b.1 .1.cmp(&a.1 .1));
     println!("\nMiss breakdown by gold POS (top reasons):");
     println!(
         "  {:<8} {:>10} {:>10}  {:>10} {:>10}",
@@ -178,7 +178,11 @@ fn process_file(
             .map(|gp| analyses.iter().any(|a| pos_matches(a.pos, gp)))
             .unwrap_or(false);
         let joint_match = gold_pos
-            .map(|gp| analyses.iter().any(|a| pos_matches(a.pos, gp) && a.lemma == gold_lemma))
+            .map(|gp| {
+                analyses
+                    .iter()
+                    .any(|a| pos_matches(a.pos, gp) && a.lemma == gold_lemma)
+            })
             .unwrap_or(false);
 
         if joint_match {

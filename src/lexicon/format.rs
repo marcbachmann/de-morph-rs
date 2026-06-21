@@ -215,7 +215,11 @@ mod tests {
         assert_eq!(AnalysisRecord::from_u32(0xFFFF_FFFF), r);
         // lemma_id alone occupies only the low 20 bits.
         assert_eq!(
-            AnalysisRecord { lemma_id: 0xF_FFFF, shape_id: 0 }.to_u32(),
+            AnalysisRecord {
+                lemma_id: 0xF_FFFF,
+                shape_id: 0
+            }
+            .to_u32(),
             0x000F_FFFF
         );
     }

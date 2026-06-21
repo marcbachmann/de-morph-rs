@@ -28,7 +28,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     eprintln!("Loading lexicon...");
     let lex = Lexicon::open(FST, DAT)?;
-    eprintln!("  {} surfaces, {} lemmas", lex.num_surfaces(), lex.num_lemmas());
+    eprintln!(
+        "  {} surfaces, {} lemmas",
+        lex.num_surfaces(),
+        lex.num_lemmas()
+    );
 
     eprintln!("Enumerating unique noun lemmas from {jsonl}");
     let mut lemmas: HashSet<String> = HashSet::new();
@@ -133,9 +137,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // × Nom/Gen/Dat/Acc), each costing one 8-byte AnalysisRecord plus a
     // share of the lemma string. ~10 bytes per record amortised.
     let bytes_saved = decomposable * 8 * 10;
-    println!(
-        "\nEstimated side-table savings if all decomposables were suppressed:"
-    );
+    println!("\nEstimated side-table savings if all decomposables were suppressed:");
     println!(
         "  ~{:.1} MiB ({} lemmas × ~8 inflections × ~10 B/record amortised)",
         bytes_saved as f64 / (1024.0 * 1024.0),

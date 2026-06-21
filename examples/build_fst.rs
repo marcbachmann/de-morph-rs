@@ -16,17 +16,12 @@
 //! Run: `cargo run --release --example build_fst`
 
 use std::collections::BTreeMap;
-use std::fs::File;
-use std::fs::metadata;
-use std::io::BufRead;
-use std::io::BufReader;
-use std::io::BufWriter;
+use std::fs::{metadata, File};
+use std::io::{BufRead, BufReader, BufWriter};
 use std::time::Instant;
 
-use anyhow::Context;
-use anyhow::Result;
-use fst::MapBuilder;
-use fst::SetBuilder;
+use anyhow::{Context, Result};
+use fst::{MapBuilder, SetBuilder};
 use serde::Deserialize;
 
 const JSONL_FILES: &[&str] = &[
@@ -105,10 +100,7 @@ fn main() -> Result<()> {
         .values()
         .flat_map(|v| v.iter().map(|r| (r.lemma.as_str(), ())))
         .collect();
-    let lemma_bytes: u64 = unique_lemmas
-        .keys()
-        .map(|s| s.len() as u64)
-        .sum::<u64>()
+    let lemma_bytes: u64 = unique_lemmas.keys().map(|s| s.len() as u64).sum::<u64>()
         + (unique_lemmas.len() as u64) * 4;
 
     // Report sizes.
@@ -122,13 +114,31 @@ fn main() -> Result<()> {
         humanize(input_bytes)
     );
     eprintln!("  Total records:                                            {total_records:>10}");
-    eprintln!("  Unique surfaces:                                          {:>10}", by_surface.len());
-    eprintln!("  Unique lemmas:                                            {:>10}", unique_lemmas.len());
+    eprintln!(
+        "  Unique surfaces:                                          {:>10}",
+        by_surface.len()
+    );
+    eprintln!(
+        "  Unique lemmas:                                            {:>10}",
+        unique_lemmas.len()
+    );
     eprintln!();
-    eprintln!("  (1) Surface Set FST (lookup only, no payload):            {:>10}", humanize(set_size));
-    eprintln!("  (2) Surface-to-payload-pointer Map FST:                   {:>10}", humanize(map_size));
-    eprintln!("  (2a) Side table needed (analyses, 12 B / row):            {:>10}", humanize(side_table_bytes));
-    eprintln!("  (2b) Lemma intern table (unique lemmas + u32 offsets):    {:>10}", humanize(lemma_bytes));
+    eprintln!(
+        "  (1) Surface Set FST (lookup only, no payload):            {:>10}",
+        humanize(set_size)
+    );
+    eprintln!(
+        "  (2) Surface-to-payload-pointer Map FST:                   {:>10}",
+        humanize(map_size)
+    );
+    eprintln!(
+        "  (2a) Side table needed (analyses, 12 B / row):            {:>10}",
+        humanize(side_table_bytes)
+    );
+    eprintln!(
+        "  (2b) Lemma intern table (unique lemmas + u32 offsets):    {:>10}",
+        humanize(lemma_bytes)
+    );
     eprintln!();
     eprintln!(
         "  Estimated total nouns-only runtime artefact:              {:>10}",

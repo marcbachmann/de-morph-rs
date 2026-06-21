@@ -24,11 +24,11 @@ const DAT_PATH: &str = "data/lexicon/lexicon.dat";
 #[derive(Default, Debug, Clone, Copy)]
 struct Counts {
     total: u64,
-    in_lex: u64,        // analyzer returned at least one (non-Guessed) analysis
-    any_hit: u64,       // analyzer returned at least one analysis (lex or guess)
-    lemma_match: u64,   // any returned analysis has lemma == gold
-    pos_match: u64,     // any returned analysis has pos == gold
-    joint_match: u64,   // any returned analysis matches both lemma and pos
+    in_lex: u64,           // analyzer returned at least one (non-Guessed) analysis
+    any_hit: u64,          // analyzer returned at least one analysis (lex or guess)
+    lemma_match: u64,      // any returned analysis has lemma == gold
+    pos_match: u64,        // any returned analysis has pos == gold
+    joint_match: u64,      // any returned analysis matches both lemma and pos
     top1_lemma_match: u64, // first returned analysis matches gold lemma
     top1_pos_match: u64,
 }
@@ -47,10 +47,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // off in the library default; eval is the right place to opt in
     // so we measure the bridge's contribution rather than excluding it.
     let analyzer = Analyzer::from_lexicon(lex).with_swiss_orthography(true);
-    eprintln!(
-        "  loaded in {:.2}s",
-        t0.elapsed().as_secs_f64()
-    );
+    eprintln!("  loaded in {:.2}s", t0.elapsed().as_secs_f64());
 
     // Expand any input path: a .conllu file is taken as-is, a
     // directory is searched (one level deep) for .conllu files. Each
@@ -114,43 +111,58 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let elapsed = t_eval.elapsed().as_secs_f64();
-    eprintln!("\n=== Aggregate ({} tokens, {:.1}s, {:.0}k tok/s) ===",
-             overall.total, elapsed,
-             overall.total as f64 / elapsed / 1000.0);
+    eprintln!(
+        "\n=== Aggregate ({} tokens, {:.1}s, {:.0}k tok/s) ===",
+        overall.total,
+        elapsed,
+        overall.total as f64 / elapsed / 1000.0
+    );
 
     print_counts("OVERALL", &overall);
 
     println!("\nBy corpus:");
-    println!("  {:<24} {:>10} {:>10} {:>10} {:>10} {:>10}",
-             "corpus", "tokens", "cov", "lemma%", "pos%", "joint%");
+    println!(
+        "  {:<24} {:>10} {:>10} {:>10} {:>10} {:>10}",
+        "corpus", "tokens", "cov", "lemma%", "pos%", "joint%"
+    );
     for (label, c) in &per_corpus {
-        if c.total == 0 { continue; }
-        println!("  {:<24} {:>10} {:>9.1}% {:>9.1}% {:>9.1}% {:>9.1}%",
-                 label,
-                 c.total,
-                 100.0 * c.any_hit as f64 / c.total as f64,
-                 100.0 * c.lemma_match as f64 / c.total as f64,
-                 100.0 * c.pos_match as f64 / c.total as f64,
-                 100.0 * c.joint_match as f64 / c.total as f64);
+        if c.total == 0 {
+            continue;
+        }
+        println!(
+            "  {:<24} {:>10} {:>9.1}% {:>9.1}% {:>9.1}% {:>9.1}%",
+            label,
+            c.total,
+            100.0 * c.any_hit as f64 / c.total as f64,
+            100.0 * c.lemma_match as f64 / c.total as f64,
+            100.0 * c.pos_match as f64 / c.total as f64,
+            100.0 * c.joint_match as f64 / c.total as f64
+        );
     }
 
     let pos_order: &[&str] = &[
-        "NOUN", "VERB", "ADJ", "ADV", "PRON", "DET", "NUM", "ADP",
-        "CCONJ", "SCONJ", "AUX", "PART", "PROPN", "PUNCT", "X",
+        "NOUN", "VERB", "ADJ", "ADV", "PRON", "DET", "NUM", "ADP", "CCONJ", "SCONJ", "AUX", "PART",
+        "PROPN", "PUNCT", "X",
     ];
     println!("\nBy gold POS:");
-    println!("  {:<7} {:>10} {:>10} {:>10} {:>10} {:>10}",
-             "POS", "tokens", "coverage", "lemma%", "pos%", "joint%");
+    println!(
+        "  {:<7} {:>10} {:>10} {:>10} {:>10} {:>10}",
+        "POS", "tokens", "coverage", "lemma%", "pos%", "joint%"
+    );
     for pos in pos_order {
         if let Some(c) = by_pos.get(pos) {
-            if c.total == 0 { continue; }
-            println!("  {:<7} {:>10} {:>9.1}% {:>9.1}% {:>9.1}% {:>9.1}%",
-                     pos,
-                     c.total,
-                     100.0 * c.any_hit as f64 / c.total as f64,
-                     100.0 * c.lemma_match as f64 / c.total as f64,
-                     100.0 * c.pos_match as f64 / c.total as f64,
-                     100.0 * c.joint_match as f64 / c.total as f64);
+            if c.total == 0 {
+                continue;
+            }
+            println!(
+                "  {:<7} {:>10} {:>9.1}% {:>9.1}% {:>9.1}% {:>9.1}%",
+                pos,
+                c.total,
+                100.0 * c.any_hit as f64 / c.total as f64,
+                100.0 * c.lemma_match as f64 / c.total as f64,
+                100.0 * c.pos_match as f64 / c.total as f64,
+                100.0 * c.joint_match as f64 / c.total as f64
+            );
         }
     }
 
@@ -158,7 +170,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\nA few unmatched examples (surface → gold lemma):");
     for pos in pos_order {
         if let Some(samples) = unmatched_examples.get(pos) {
-            if samples.is_empty() { continue; }
+            if samples.is_empty() {
+                continue;
+            }
             print!("  {}: ", pos);
             for (s, l) in samples.iter().take(6) {
                 print!("{s}→{l}  ");
@@ -210,15 +224,19 @@ fn process_file(
         };
 
         let any_hit = !analyses.is_empty();
-        let in_lex = analyses
-            .iter()
-            .any(|a| a.source == de_morph::Source::Lexicon || a.source == de_morph::Source::Generated);
+        let in_lex = analyses.iter().any(|a| {
+            a.source == de_morph::Source::Lexicon || a.source == de_morph::Source::Generated
+        });
         let lemma_match = analyses.iter().any(|a| a.lemma == gold_lemma);
         let pos_match = gold_pos
             .map(|gp| analyses.iter().any(|a| pos_matches(a.pos, gp)))
             .unwrap_or(false);
         let joint_match = gold_pos
-            .map(|gp| analyses.iter().any(|a| pos_matches(a.pos, gp) && a.lemma == gold_lemma))
+            .map(|gp| {
+                analyses
+                    .iter()
+                    .any(|a| pos_matches(a.pos, gp) && a.lemma == gold_lemma)
+            })
             .unwrap_or(false);
         let top1_lemma_match = analyses.first().is_some_and(|a| a.lemma == gold_lemma);
         let top1_pos_match = gold_pos
@@ -269,13 +287,39 @@ fn print_counts(label: &str, c: &Counts) {
     let pct = |n: u64| 100.0 * n as f64 / c.total as f64;
     println!("  {label}:");
     println!("    tokens                   {:>10}", c.total);
-    println!("    any analysis returned    {:>9.1}%   ({})", pct(c.any_hit), c.any_hit);
-    println!("    in lexicon (not guessed) {:>9.1}%   ({})", pct(c.in_lex), c.in_lex);
-    println!("    lemma in any analysis    {:>9.1}%   ({})", pct(c.lemma_match), c.lemma_match);
-    println!("    pos in any analysis      {:>9.1}%   ({})", pct(c.pos_match), c.pos_match);
-    println!("    joint (lemma + pos) any  {:>9.1}%   ({})", pct(c.joint_match), c.joint_match);
-    println!("    lemma first analysis     {:>9.1}%", pct(c.top1_lemma_match));
-    println!("    pos   first analysis     {:>9.1}%", pct(c.top1_pos_match));
+    println!(
+        "    any analysis returned    {:>9.1}%   ({})",
+        pct(c.any_hit),
+        c.any_hit
+    );
+    println!(
+        "    in lexicon (not guessed) {:>9.1}%   ({})",
+        pct(c.in_lex),
+        c.in_lex
+    );
+    println!(
+        "    lemma in any analysis    {:>9.1}%   ({})",
+        pct(c.lemma_match),
+        c.lemma_match
+    );
+    println!(
+        "    pos in any analysis      {:>9.1}%   ({})",
+        pct(c.pos_match),
+        c.pos_match
+    );
+    println!(
+        "    joint (lemma + pos) any  {:>9.1}%   ({})",
+        pct(c.joint_match),
+        c.joint_match
+    );
+    println!(
+        "    lemma first analysis     {:>9.1}%",
+        pct(c.top1_lemma_match)
+    );
+    println!(
+        "    pos   first analysis     {:>9.1}%",
+        pct(c.top1_pos_match)
+    );
 }
 
 /// Map CoNLL-U UPOS string → our UPOS enum. Returns None for tags we

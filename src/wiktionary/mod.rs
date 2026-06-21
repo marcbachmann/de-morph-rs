@@ -27,9 +27,9 @@ pub mod template;
 pub mod verb;
 
 pub use dump::{Page, PageReader};
-pub use template::{Template, find_templates, parse_template_body};
+pub use template::{find_templates, parse_template_body, Template};
 
-use crate::analysis::{Features, UPOS, Source};
+use crate::analysis::{Features, Source, UPOS};
 
 /// One extracted (surface form, analysis) record with provenance back
 /// to the source Wiktionary article. Shared between the noun and verb

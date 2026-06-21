@@ -37,7 +37,7 @@
 //! because the maintainer did not consult a copy while writing this
 //! file.
 
-use crate::analysis::{Analysis, Features, Mood, Number, Person, UPOS, Source, Tense, VerbForm};
+use crate::analysis::{Analysis, Features, Mood, Number, Person, Source, Tense, VerbForm, UPOS};
 
 /// The Wiktionary-attested forms for one verb, as parsed from the
 /// `{{Deutsch Verb Übersicht}}` template.
@@ -79,7 +79,13 @@ pub fn generate_verb_paradigm(inputs: &VerbAttested) -> Vec<VerbCell> {
     let stem = infinitive_stem(inf);
 
     // --- Non-finite forms -------------------------------------------------
-    push(&mut out, inf, inf, Source::Generated, features_form(VerbForm::Inf));
+    push(
+        &mut out,
+        inf,
+        inf,
+        Source::Generated,
+        features_form(VerbForm::Inf),
+    );
     push(
         &mut out,
         &format!("zu {inf}"),
@@ -95,7 +101,13 @@ pub fn generate_verb_paradigm(inputs: &VerbAttested) -> Vec<VerbCell> {
         features_form(VerbForm::PtcPres),
     );
     if let Some(p2) = inputs.partizip_perf {
-        push(&mut out, p2, inf, Source::Lexicon, features_form(VerbForm::PtcPerf));
+        push(
+            &mut out,
+            p2,
+            inf,
+            Source::Lexicon,
+            features_form(VerbForm::PtcPerf),
+        );
     }
 
     // --- Present Indikativ ------------------------------------------------
@@ -455,13 +467,7 @@ fn join_separable(
 }
 
 #[inline]
-fn push(
-    out: &mut Vec<VerbCell>,
-    surface: &str,
-    lemma: &str,
-    source: Source,
-    features: Features,
-) {
+fn push(out: &mut Vec<VerbCell>, surface: &str, lemma: &str, source: Source, features: Features) {
     let analysis = Analysis::with_source(lemma, UPOS::VERB, features, source);
     out.push((surface.to_string(), analysis));
 }
@@ -691,12 +697,30 @@ mod tests {
                 Some(VerbForm::Fin),
             )
         };
-        assert_eq!(pi(Person::P1, Number::Sg), vec![("liebe".into(), Source::Lexicon)]);
-        assert_eq!(pi(Person::P2, Number::Sg), vec![("liebst".into(), Source::Lexicon)]);
-        assert_eq!(pi(Person::P3, Number::Sg), vec![("liebt".into(), Source::Lexicon)]);
-        assert_eq!(pi(Person::P1, Number::Pl), vec![("lieben".into(), Source::Generated)]);
-        assert_eq!(pi(Person::P2, Number::Pl), vec![("liebt".into(), Source::Generated)]);
-        assert_eq!(pi(Person::P3, Number::Pl), vec![("lieben".into(), Source::Generated)]);
+        assert_eq!(
+            pi(Person::P1, Number::Sg),
+            vec![("liebe".into(), Source::Lexicon)]
+        );
+        assert_eq!(
+            pi(Person::P2, Number::Sg),
+            vec![("liebst".into(), Source::Lexicon)]
+        );
+        assert_eq!(
+            pi(Person::P3, Number::Sg),
+            vec![("liebt".into(), Source::Lexicon)]
+        );
+        assert_eq!(
+            pi(Person::P1, Number::Pl),
+            vec![("lieben".into(), Source::Generated)]
+        );
+        assert_eq!(
+            pi(Person::P2, Number::Pl),
+            vec![("liebt".into(), Source::Generated)]
+        );
+        assert_eq!(
+            pi(Person::P3, Number::Pl),
+            vec![("lieben".into(), Source::Generated)]
+        );
     }
 
     #[test]
@@ -713,15 +737,33 @@ mod tests {
             )
         };
         // 1Sg attested as "liebte"; 3Sg = 1Sg in German past.
-        assert_eq!(past(Person::P1, Number::Sg), vec![("liebte".into(), Source::Lexicon)]);
-        assert_eq!(past(Person::P3, Number::Sg), vec![("liebte".into(), Source::Generated)]);
+        assert_eq!(
+            past(Person::P1, Number::Sg),
+            vec![("liebte".into(), Source::Lexicon)]
+        );
+        assert_eq!(
+            past(Person::P3, Number::Sg),
+            vec![("liebte".into(), Source::Generated)]
+        );
         // 2Sg adds "st" after the -e stem: "liebtest".
-        assert_eq!(past(Person::P2, Number::Sg), vec![("liebtest".into(), Source::Generated)]);
+        assert_eq!(
+            past(Person::P2, Number::Sg),
+            vec![("liebtest".into(), Source::Generated)]
+        );
         // 1Pl/3Pl: stem ends in -e, so add just -n: "liebten".
-        assert_eq!(past(Person::P1, Number::Pl), vec![("liebten".into(), Source::Generated)]);
-        assert_eq!(past(Person::P3, Number::Pl), vec![("liebten".into(), Source::Generated)]);
+        assert_eq!(
+            past(Person::P1, Number::Pl),
+            vec![("liebten".into(), Source::Generated)]
+        );
+        assert_eq!(
+            past(Person::P3, Number::Pl),
+            vec![("liebten".into(), Source::Generated)]
+        );
         // 2Pl: "liebtet".
-        assert_eq!(past(Person::P2, Number::Pl), vec![("liebtet".into(), Source::Generated)]);
+        assert_eq!(
+            past(Person::P2, Number::Pl),
+            vec![("liebtet".into(), Source::Generated)]
+        );
     }
 
     #[test]
@@ -738,12 +780,30 @@ mod tests {
                 Some(VerbForm::Fin),
             )
         };
-        assert_eq!(k1(Person::P1, Number::Sg), vec![("liebe".into(), Source::Generated)]);
-        assert_eq!(k1(Person::P2, Number::Sg), vec![("liebest".into(), Source::Generated)]);
-        assert_eq!(k1(Person::P3, Number::Sg), vec![("liebe".into(), Source::Generated)]);
-        assert_eq!(k1(Person::P1, Number::Pl), vec![("lieben".into(), Source::Generated)]);
-        assert_eq!(k1(Person::P2, Number::Pl), vec![("liebet".into(), Source::Generated)]);
-        assert_eq!(k1(Person::P3, Number::Pl), vec![("lieben".into(), Source::Generated)]);
+        assert_eq!(
+            k1(Person::P1, Number::Sg),
+            vec![("liebe".into(), Source::Generated)]
+        );
+        assert_eq!(
+            k1(Person::P2, Number::Sg),
+            vec![("liebest".into(), Source::Generated)]
+        );
+        assert_eq!(
+            k1(Person::P3, Number::Sg),
+            vec![("liebe".into(), Source::Generated)]
+        );
+        assert_eq!(
+            k1(Person::P1, Number::Pl),
+            vec![("lieben".into(), Source::Generated)]
+        );
+        assert_eq!(
+            k1(Person::P2, Number::Pl),
+            vec![("liebet".into(), Source::Generated)]
+        );
+        assert_eq!(
+            k1(Person::P3, Number::Pl),
+            vec![("lieben".into(), Source::Generated)]
+        );
     }
 
     #[test]
@@ -760,9 +820,18 @@ mod tests {
             )
         };
         // 1Sg attested as "liebte"; rest derived.
-        assert_eq!(k2(Person::P1, Number::Sg), vec![("liebte".into(), Source::Lexicon)]);
-        assert_eq!(k2(Person::P2, Number::Sg), vec![("liebtest".into(), Source::Generated)]);
-        assert_eq!(k2(Person::P1, Number::Pl), vec![("liebten".into(), Source::Generated)]);
+        assert_eq!(
+            k2(Person::P1, Number::Sg),
+            vec![("liebte".into(), Source::Lexicon)]
+        );
+        assert_eq!(
+            k2(Person::P2, Number::Sg),
+            vec![("liebtest".into(), Source::Generated)]
+        );
+        assert_eq!(
+            k2(Person::P1, Number::Pl),
+            vec![("liebten".into(), Source::Generated)]
+        );
     }
 
     #[test]
@@ -807,12 +876,30 @@ mod tests {
                 Some(VerbForm::Fin),
             )
         };
-        assert_eq!(past(Person::P1, Number::Sg), vec![("sang".into(), Source::Lexicon)]);
-        assert_eq!(past(Person::P2, Number::Sg), vec![("sangst".into(), Source::Generated)]);
-        assert_eq!(past(Person::P3, Number::Sg), vec![("sang".into(), Source::Generated)]);
-        assert_eq!(past(Person::P1, Number::Pl), vec![("sangen".into(), Source::Generated)]);
-        assert_eq!(past(Person::P2, Number::Pl), vec![("sangt".into(), Source::Generated)]);
-        assert_eq!(past(Person::P3, Number::Pl), vec![("sangen".into(), Source::Generated)]);
+        assert_eq!(
+            past(Person::P1, Number::Sg),
+            vec![("sang".into(), Source::Lexicon)]
+        );
+        assert_eq!(
+            past(Person::P2, Number::Sg),
+            vec![("sangst".into(), Source::Generated)]
+        );
+        assert_eq!(
+            past(Person::P3, Number::Sg),
+            vec![("sang".into(), Source::Generated)]
+        );
+        assert_eq!(
+            past(Person::P1, Number::Pl),
+            vec![("sangen".into(), Source::Generated)]
+        );
+        assert_eq!(
+            past(Person::P2, Number::Pl),
+            vec![("sangt".into(), Source::Generated)]
+        );
+        assert_eq!(
+            past(Person::P3, Number::Pl),
+            vec![("sangen".into(), Source::Generated)]
+        );
     }
 
     #[test]
@@ -842,8 +929,14 @@ mod tests {
                 Some(VerbForm::Fin),
             )
         };
-        assert_eq!(past(Person::P2, Number::Sg), vec![("aßest".into(), Source::Generated)]);
-        assert_eq!(past(Person::P2, Number::Pl), vec![("aßt".into(), Source::Generated)]);
+        assert_eq!(
+            past(Person::P2, Number::Sg),
+            vec![("aßest".into(), Source::Generated)]
+        );
+        assert_eq!(
+            past(Person::P2, Number::Pl),
+            vec![("aßt".into(), Source::Generated)]
+        );
         assert!(
             !cells.iter().any(|(s, _)| s == "aßst"),
             "over-generated unpronounceable 'aßst'"
@@ -902,9 +995,18 @@ mod tests {
         };
         // Without overrides, the rule would emit "sein" for 1Pl/3Pl
         // and "seint" or similar for 2Pl. The override fixes all three.
-        assert_eq!(pi(Person::P1, Number::Pl), vec![("sind".into(), Source::Lexicon)]);
-        assert_eq!(pi(Person::P2, Number::Pl), vec![("seid".into(), Source::Lexicon)]);
-        assert_eq!(pi(Person::P3, Number::Pl), vec![("sind".into(), Source::Lexicon)]);
+        assert_eq!(
+            pi(Person::P1, Number::Pl),
+            vec![("sind".into(), Source::Lexicon)]
+        );
+        assert_eq!(
+            pi(Person::P2, Number::Pl),
+            vec![("seid".into(), Source::Lexicon)]
+        );
+        assert_eq!(
+            pi(Person::P3, Number::Pl),
+            vec![("sind".into(), Source::Lexicon)]
+        );
     }
 
     #[test]
@@ -932,8 +1034,14 @@ mod tests {
             )
         };
         // 1Sg and 3Sg Konj I should be "sei", not "seie".
-        assert_eq!(k1(Person::P1, Number::Sg), vec![("sei".into(), Source::Lexicon)]);
-        assert_eq!(k1(Person::P3, Number::Sg), vec![("sei".into(), Source::Lexicon)]);
+        assert_eq!(
+            k1(Person::P1, Number::Sg),
+            vec![("sei".into(), Source::Lexicon)]
+        );
+        assert_eq!(
+            k1(Person::P3, Number::Sg),
+            vec![("sei".into(), Source::Lexicon)]
+        );
     }
 
     #[test]
@@ -1039,9 +1147,15 @@ mod tests {
         assert!(has("abtauchtest"), "2Sg past");
         assert!(!has("zu abtauchen"), "wrong zu-inf must be gone");
         // Imperatives are inherently separated (two-token) — not emitted.
-        assert!(
-            find(&cells, Some(Person::P2), Some(Number::Sg), None, Some(Mood::Imp), Some(VerbForm::Fin)).is_empty()
-        );
+        assert!(find(
+            &cells,
+            Some(Person::P2),
+            Some(Number::Sg),
+            None,
+            Some(Mood::Imp),
+            Some(VerbForm::Fin)
+        )
+        .is_empty());
     }
 
     #[test]

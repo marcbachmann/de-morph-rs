@@ -7,34 +7,19 @@
 //! `src/lexicon/format.rs` for the layout.
 
 use std::collections::HashMap;
-use std::fs::File;
-use std::fs::metadata;
-use std::io::BufRead;
-use std::io::BufReader;
-use std::io::BufWriter;
+use std::fs::{metadata, File};
+use std::io::{BufRead, BufReader, BufWriter};
 use std::path::PathBuf;
 use std::time::Instant;
 
-use anyhow::Context;
-use anyhow::Result;
-use serde::Deserialize;
-
-use de_morph::analysis::Aux;
-use de_morph::analysis::Case;
-use de_morph::analysis::Degree;
-use de_morph::analysis::Features;
-use de_morph::analysis::Gender;
-use de_morph::analysis::Mood;
-use de_morph::analysis::PronType;
-use de_morph::analysis::Number;
-use de_morph::analysis::Person;
-use de_morph::analysis::UPOS;
-use de_morph::analysis::Source;
-use de_morph::analysis::Tense;
-use de_morph::analysis::VerbForm;
-use de_morph::lexicon::is_clean_surface;
-use de_morph::lexicon::LexiconBuilder;
+use anyhow::{Context, Result};
+use de_morph::analysis::{
+    Aux, Case, Degree, Features, Gender, Mood, Number, Person, PronType, Source, Tense, VerbForm,
+    UPOS,
+};
+use de_morph::lexicon::{is_clean_surface, LexiconBuilder};
 use de_morph::paradigm::generate_closed_class_entries;
+use serde::Deserialize;
 
 #[derive(Deserialize)]
 struct Record {
@@ -164,8 +149,16 @@ fn main() -> Result<()> {
     eprintln!("  Lemmas:          {:>10}", stats.num_lemmas);
     eprintln!("  Analyses:        {:>10}", stats.num_analyses);
     eprintln!("  Total records:   {:>10}", stats.total_records);
-    eprintln!("  FST file:        {:>10}  ({})", humanize(fst_size), args.fst_out.display());
-    eprintln!("  Side table:      {:>10}  ({})", humanize(dat_size), args.dat_out.display());
+    eprintln!(
+        "  FST file:        {:>10}  ({})",
+        humanize(fst_size),
+        args.fst_out.display()
+    );
+    eprintln!(
+        "  Side table:      {:>10}  ({})",
+        humanize(dat_size),
+        args.dat_out.display()
+    );
     eprintln!("  Combined:        {:>10}", humanize(fst_size + dat_size));
     eprintln!();
     eprintln!("By POS:");
@@ -195,8 +188,8 @@ fn ingest_file(
     let reader = BufReader::new(file);
     for (lineno, line) in reader.lines().enumerate() {
         let line = line?;
-        let rec: Record = serde_json::from_str(&line)
-            .with_context(|| format!("line {}", lineno + 1))?;
+        let rec: Record =
+            serde_json::from_str(&line).with_context(|| format!("line {}", lineno + 1))?;
 
         // Drop surfaces contaminated by leaked wikitext/HTML markup or
         // control whitespace (HTML comments, <small> tags, embedded

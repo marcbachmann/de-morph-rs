@@ -37,7 +37,9 @@ impl<'a> Template<'a> {
     /// Look up a named argument by key. Returns the first match in source
     /// order.
     pub fn named_arg(&self, key: &str) -> Option<&'a str> {
-        self.named.iter().find_map(|(k, v)| (*k == key).then_some(*v))
+        self.named
+            .iter()
+            .find_map(|(k, v)| (*k == key).then_some(*v))
     }
 
     /// Return the n-th positional argument (1-based, matching MediaWiki
@@ -78,7 +80,9 @@ pub fn find_templates(text: &str) -> Vec<Template<'_>> {
 /// Given the source bytes and the index of an opening `{{`, return the
 /// byte index just past the matching `}}`. `None` if unmatched.
 fn scan_to_matching_close(bytes: &[u8], open_at: usize) -> Option<usize> {
-    debug_assert!(open_at + 1 < bytes.len() && bytes[open_at] == b'{' && bytes[open_at + 1] == b'{');
+    debug_assert!(
+        open_at + 1 < bytes.len() && bytes[open_at] == b'{' && bytes[open_at + 1] == b'{'
+    );
     let mut depth: i32 = 1;
     let mut i = open_at + 2;
     while i + 1 < bytes.len() {

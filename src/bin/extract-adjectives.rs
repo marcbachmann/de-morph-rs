@@ -11,12 +11,11 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 use anyhow::{Context, Result};
-use serde::Serialize;
-
-use de_morph::analysis::{Case, Declension, Degree, Gender, Number, UPOS, Source};
+use de_morph::analysis::{Case, Declension, Degree, Gender, Number, Source, UPOS};
 use de_morph::wiktionary::adjective::extract_adjectives;
 use de_morph::wiktionary::dump::PageReader;
 use de_morph::wiktionary::ExtractedEntry;
+use serde::Serialize;
 
 const DEFAULT_INPUT: &str = "data/wiktionary/raw/dewiktionary-20260601-pages-articles.xml.bz2";
 const DEFAULT_OUTPUT: &str = "data/wiktionary/processed/adjectives.jsonl";

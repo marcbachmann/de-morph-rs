@@ -3,7 +3,9 @@
 //! Run with: `cargo run --example dative_demo`
 
 use de_morph::analysis::Gender;
-use de_morph::paradigm::noun::{NounClass, generate_noun_paradigm, guess_noun, predict_dative_forms};
+use de_morph::paradigm::noun::{
+    generate_noun_paradigm, guess_noun, predict_dative_forms, NounClass,
+};
 
 fn main() {
     println!("=== Generation: Tisch (strong masc), all 8 cells ===");
@@ -49,7 +51,9 @@ fn main() {
         println!("  {} (confidence: {:?})", form, conf);
     }
 
-    println!("\n=== predict_dative_forms(\"Quitsch\") — no suffix match, low confidence fallback ===");
+    println!(
+        "\n=== predict_dative_forms(\"Quitsch\") — no suffix match, low confidence fallback ==="
+    );
     for (form, conf) in predict_dative_forms("Quitsch") {
         println!("  {} (confidence: {:?})", form, conf);
     }

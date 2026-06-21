@@ -32,9 +32,9 @@
 //! - Wiktionary Wortart inventory: <https://de.wiktionary.org/wiki/Vorlage:Wortart>
 //! - UD PROPN definition: <https://universaldependencies.org/u/pos/PROPN.html>
 
-use crate::analysis::{Case, Features, Gender, Number, UPOS, Source};
+use crate::analysis::{Case, Features, Gender, Number, Source, UPOS};
+use crate::wiktionary::template::{find_templates, Template};
 use crate::wiktionary::ExtractedEntry;
-use crate::wiktionary::template::{Template, find_templates};
 
 /// Wortart values that classify a page as a proper noun (PROPN).
 const PROPN_WORTART: &[&str] = &[
@@ -112,7 +112,11 @@ fn detect_vorname_gender(page_text: &str) -> Option<Gender> {
 /// Parse the Nominativ/Genitiv/Dativ/Akkusativ Singular/Plural cells
 /// out of a `{{Deutsch Vorname Übersicht}}` template into individual
 /// proper-noun entries (one per (case, number) cell).
-fn parse_vorname_cells(tpl: &Template<'_>, title: &str, gender: Option<Gender>) -> Vec<ExtractedEntry> {
+fn parse_vorname_cells(
+    tpl: &Template<'_>,
+    title: &str,
+    gender: Option<Gender>,
+) -> Vec<ExtractedEntry> {
     let mut out = Vec::new();
     let cases = [
         ("Nominativ", Case::Nom),
@@ -239,7 +243,9 @@ mod tests {
         // At least 6 cells (Nom Sg, Nom Pl, Gen Sg, Gen Sg*, Dat Sg, Akk Sg).
         assert!(entries.len() >= 6, "got {} entries", entries.len());
         assert!(entries.iter().all(|e| e.pos == UPOS::PROPN));
-        assert!(entries.iter().all(|e| e.features.gender == Some(Gender::Fem)));
+        assert!(entries
+            .iter()
+            .all(|e| e.features.gender == Some(Gender::Fem)));
         assert!(entries.iter().any(|e| e.surface == "Mariens"));
     }
 

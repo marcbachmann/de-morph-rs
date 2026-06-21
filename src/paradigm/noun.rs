@@ -34,13 +34,7 @@
 //! - `guess_noun` does one ASCII-lowercase allocation plus one
 //!   `ends_with` per suffix rule. ~25 rules → sub-microsecond per call.
 
-use crate::analysis::Analysis;
-use crate::analysis::Case;
-use crate::analysis::Features;
-use crate::analysis::Gender;
-use crate::analysis::Number;
-use crate::analysis::UPOS;
-use crate::analysis::Source;
+use crate::analysis::{Analysis, Case, Features, Gender, Number, Source, UPOS};
 
 /// Declension class for a German noun. Drives Genitiv-Singular formation
 /// and (for `WeakMasc`) the dative/accusative-singular forms.
@@ -383,8 +377,7 @@ fn genitive_singular_forms(lemma: &str) -> Vec<String> {
 /// it ends in unstressed `-el` / `-er` / `-en` AND has at least two
 /// vowel groups (i.e. is polysyllabic).
 fn takes_s_only_genitive(lemma: &str) -> bool {
-    let unstressed_suffix =
-        lemma.ends_with("el") || lemma.ends_with("er") || lemma.ends_with("en");
+    let unstressed_suffix = lemma.ends_with("el") || lemma.ends_with("er") || lemma.ends_with("en");
     unstressed_suffix && count_vowel_groups(lemma) >= 2
 }
 
@@ -394,8 +387,23 @@ fn count_vowel_groups(lemma: &str) -> usize {
     let is_vowel = |c: char| {
         matches!(
             c,
-            'a' | 'e' | 'i' | 'o' | 'u' | 'ä' | 'ö' | 'ü' | 'y'
-                | 'A' | 'E' | 'I' | 'O' | 'U' | 'Ä' | 'Ö' | 'Ü' | 'Y'
+            'a' | 'e'
+                | 'i'
+                | 'o'
+                | 'u'
+                | 'ä'
+                | 'ö'
+                | 'ü'
+                | 'y'
+                | 'A'
+                | 'E'
+                | 'I'
+                | 'O'
+                | 'U'
+                | 'Ä'
+                | 'Ö'
+                | 'Ü'
+                | 'Y'
         )
     };
     let mut groups = 0;
@@ -475,31 +483,131 @@ struct SuffixRule {
 /// did not consult a specific reference while assembling this table.
 const SUFFIX_RULES: &[SuffixRule] = &[
     // High-confidence feminine suffixes (essentially diagnostic).
-    SuffixRule { suffix: "ung",    gender: Gender::Fem,  class: NounClass::Strong,   confidence: Confidence::High },
-    SuffixRule { suffix: "heit",   gender: Gender::Fem,  class: NounClass::Strong,   confidence: Confidence::High },
-    SuffixRule { suffix: "keit",   gender: Gender::Fem,  class: NounClass::Strong,   confidence: Confidence::High },
-    SuffixRule { suffix: "schaft", gender: Gender::Fem,  class: NounClass::Strong,   confidence: Confidence::High },
-    SuffixRule { suffix: "tät",    gender: Gender::Fem,  class: NounClass::Strong,   confidence: Confidence::High },
-    SuffixRule { suffix: "ion",    gender: Gender::Fem,  class: NounClass::Strong,   confidence: Confidence::High },
+    SuffixRule {
+        suffix: "ung",
+        gender: Gender::Fem,
+        class: NounClass::Strong,
+        confidence: Confidence::High,
+    },
+    SuffixRule {
+        suffix: "heit",
+        gender: Gender::Fem,
+        class: NounClass::Strong,
+        confidence: Confidence::High,
+    },
+    SuffixRule {
+        suffix: "keit",
+        gender: Gender::Fem,
+        class: NounClass::Strong,
+        confidence: Confidence::High,
+    },
+    SuffixRule {
+        suffix: "schaft",
+        gender: Gender::Fem,
+        class: NounClass::Strong,
+        confidence: Confidence::High,
+    },
+    SuffixRule {
+        suffix: "tät",
+        gender: Gender::Fem,
+        class: NounClass::Strong,
+        confidence: Confidence::High,
+    },
+    SuffixRule {
+        suffix: "ion",
+        gender: Gender::Fem,
+        class: NounClass::Strong,
+        confidence: Confidence::High,
+    },
     // Medium-confidence feminine.
-    SuffixRule { suffix: "anz",    gender: Gender::Fem,  class: NounClass::Strong,   confidence: Confidence::Medium },
-    SuffixRule { suffix: "enz",    gender: Gender::Fem,  class: NounClass::Strong,   confidence: Confidence::Medium },
-    SuffixRule { suffix: "ie",     gender: Gender::Fem,  class: NounClass::Strong,   confidence: Confidence::Medium },
-    SuffixRule { suffix: "ik",     gender: Gender::Fem,  class: NounClass::Strong,   confidence: Confidence::Medium },
+    SuffixRule {
+        suffix: "anz",
+        gender: Gender::Fem,
+        class: NounClass::Strong,
+        confidence: Confidence::Medium,
+    },
+    SuffixRule {
+        suffix: "enz",
+        gender: Gender::Fem,
+        class: NounClass::Strong,
+        confidence: Confidence::Medium,
+    },
+    SuffixRule {
+        suffix: "ie",
+        gender: Gender::Fem,
+        class: NounClass::Strong,
+        confidence: Confidence::Medium,
+    },
+    SuffixRule {
+        suffix: "ik",
+        gender: Gender::Fem,
+        class: NounClass::Strong,
+        confidence: Confidence::Medium,
+    },
     // Diminutives — almost always neuter.
-    SuffixRule { suffix: "chen",   gender: Gender::Neut, class: NounClass::Strong,   confidence: Confidence::High },
-    SuffixRule { suffix: "lein",   gender: Gender::Neut, class: NounClass::Strong,   confidence: Confidence::High },
+    SuffixRule {
+        suffix: "chen",
+        gender: Gender::Neut,
+        class: NounClass::Strong,
+        confidence: Confidence::High,
+    },
+    SuffixRule {
+        suffix: "lein",
+        gender: Gender::Neut,
+        class: NounClass::Strong,
+        confidence: Confidence::High,
+    },
     // Medium-confidence neuter.
-    SuffixRule { suffix: "nis",    gender: Gender::Neut, class: NounClass::Strong,   confidence: Confidence::Medium },
-    SuffixRule { suffix: "tum",    gender: Gender::Neut, class: NounClass::Strong,   confidence: Confidence::Medium },
+    SuffixRule {
+        suffix: "nis",
+        gender: Gender::Neut,
+        class: NounClass::Strong,
+        confidence: Confidence::Medium,
+    },
+    SuffixRule {
+        suffix: "tum",
+        gender: Gender::Neut,
+        class: NounClass::Strong,
+        confidence: Confidence::Medium,
+    },
     // Weak masculines (n-stems).
-    SuffixRule { suffix: "ant",    gender: Gender::Masc, class: NounClass::WeakMasc, confidence: Confidence::High },
-    SuffixRule { suffix: "ent",    gender: Gender::Masc, class: NounClass::WeakMasc, confidence: Confidence::High },
-    SuffixRule { suffix: "ist",    gender: Gender::Masc, class: NounClass::WeakMasc, confidence: Confidence::High },
-    SuffixRule { suffix: "oge",    gender: Gender::Masc, class: NounClass::WeakMasc, confidence: Confidence::High },
+    SuffixRule {
+        suffix: "ant",
+        gender: Gender::Masc,
+        class: NounClass::WeakMasc,
+        confidence: Confidence::High,
+    },
+    SuffixRule {
+        suffix: "ent",
+        gender: Gender::Masc,
+        class: NounClass::WeakMasc,
+        confidence: Confidence::High,
+    },
+    SuffixRule {
+        suffix: "ist",
+        gender: Gender::Masc,
+        class: NounClass::WeakMasc,
+        confidence: Confidence::High,
+    },
+    SuffixRule {
+        suffix: "oge",
+        gender: Gender::Masc,
+        class: NounClass::WeakMasc,
+        confidence: Confidence::High,
+    },
     // Strong masculines.
-    SuffixRule { suffix: "ling",   gender: Gender::Masc, class: NounClass::Strong,   confidence: Confidence::High },
-    SuffixRule { suffix: "or",     gender: Gender::Masc, class: NounClass::Strong,   confidence: Confidence::Medium },
+    SuffixRule {
+        suffix: "ling",
+        gender: Gender::Masc,
+        class: NounClass::Strong,
+        confidence: Confidence::High,
+    },
+    SuffixRule {
+        suffix: "or",
+        gender: Gender::Masc,
+        class: NounClass::Strong,
+        confidence: Confidence::Medium,
+    },
 ];
 
 /// Insert or merge a (form, confidence) entry, preserving the best
@@ -542,10 +650,9 @@ mod tests {
         assert!(p.iter().all(|(_, a)| a.source == Source::Generated));
         assert!(p.iter().all(|(_, a)| a.pos == UPOS::NOUN));
         assert!(p.iter().all(|(_, a)| a.lemma == "Tisch"));
-        assert!(
-            p.iter()
-                .all(|(_, a)| a.features.gender == Some(Gender::Masc))
-        );
+        assert!(p
+            .iter()
+            .all(|(_, a)| a.features.gender == Some(Gender::Masc)));
     }
 
     #[test]
@@ -711,10 +818,13 @@ mod tests {
         // carry Source::Generated downstream (verified separately via
         // generate_noun_paradigm — the predict_* helper drops the
         // analysis and only returns surfaces).
-        let p = generate_noun_paradigm("Fassung", Gender::Fem, NounClass::Strong, Some("Fassungen"));
+        let p =
+            generate_noun_paradigm("Fassung", Gender::Fem, NounClass::Strong, Some("Fassungen"));
         let dat_sg = p
             .iter()
-            .find(|(_, a)| a.features.case == Some(Case::Dat) && a.features.number == Some(Number::Sg))
+            .find(|(_, a)| {
+                a.features.case == Some(Case::Dat) && a.features.number == Some(Number::Sg)
+            })
             .unwrap();
         assert_eq!(dat_sg.1.source, Source::Generated);
     }

@@ -16,9 +16,8 @@
 
 use std::borrow::Cow;
 
-use crate::analysis::{Case, Features, Gender, Number, UPOS, Source};
-use crate::wiktionary::template::find_templates;
-use crate::wiktionary::template::Template;
+use crate::analysis::{Case, Features, Gender, Number, Source, UPOS};
+use crate::wiktionary::template::{find_templates, Template};
 use crate::wiktionary::ExtractedEntry;
 
 /// Extract all noun analyses from a Wiktionary page.

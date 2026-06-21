@@ -17,7 +17,7 @@
 //!   same table.
 //! - Article paradigms (der, ein, kein): same.
 
-use crate::analysis::{Analysis, Case, Features, Gender, Number, Person, UPOS, PronType, Source};
+use crate::analysis::{Analysis, Case, Features, Gender, Number, Person, PronType, Source, UPOS};
 
 /// One generated closed-class entry.
 pub type ClosedClassEntry = (String, Analysis);
@@ -91,20 +91,104 @@ const PERSONAL_PRONOUNS: &[(&str, &str, Person, Number, Option<Gender>, Case)] =
     ("dir", "du", Person::P2, Number::Sg, None, Case::Dat),
     ("dich", "du", Person::P2, Number::Sg, None, Case::Acc),
     // 3Sg Masc (lemma: er)
-    ("er", "er", Person::P3, Number::Sg, Some(Gender::Masc), Case::Nom),
-    ("seiner", "er", Person::P3, Number::Sg, Some(Gender::Masc), Case::Gen),
-    ("ihm", "er", Person::P3, Number::Sg, Some(Gender::Masc), Case::Dat),
-    ("ihn", "er", Person::P3, Number::Sg, Some(Gender::Masc), Case::Acc),
+    (
+        "er",
+        "er",
+        Person::P3,
+        Number::Sg,
+        Some(Gender::Masc),
+        Case::Nom,
+    ),
+    (
+        "seiner",
+        "er",
+        Person::P3,
+        Number::Sg,
+        Some(Gender::Masc),
+        Case::Gen,
+    ),
+    (
+        "ihm",
+        "er",
+        Person::P3,
+        Number::Sg,
+        Some(Gender::Masc),
+        Case::Dat,
+    ),
+    (
+        "ihn",
+        "er",
+        Person::P3,
+        Number::Sg,
+        Some(Gender::Masc),
+        Case::Acc,
+    ),
     // 3Sg Fem (lemma: sie)
-    ("sie", "sie", Person::P3, Number::Sg, Some(Gender::Fem), Case::Nom),
-    ("ihrer", "sie", Person::P3, Number::Sg, Some(Gender::Fem), Case::Gen),
-    ("ihr", "sie", Person::P3, Number::Sg, Some(Gender::Fem), Case::Dat),
-    ("sie", "sie", Person::P3, Number::Sg, Some(Gender::Fem), Case::Acc),
+    (
+        "sie",
+        "sie",
+        Person::P3,
+        Number::Sg,
+        Some(Gender::Fem),
+        Case::Nom,
+    ),
+    (
+        "ihrer",
+        "sie",
+        Person::P3,
+        Number::Sg,
+        Some(Gender::Fem),
+        Case::Gen,
+    ),
+    (
+        "ihr",
+        "sie",
+        Person::P3,
+        Number::Sg,
+        Some(Gender::Fem),
+        Case::Dat,
+    ),
+    (
+        "sie",
+        "sie",
+        Person::P3,
+        Number::Sg,
+        Some(Gender::Fem),
+        Case::Acc,
+    ),
     // 3Sg Neut (lemma: es)
-    ("es", "es", Person::P3, Number::Sg, Some(Gender::Neut), Case::Nom),
-    ("seiner", "es", Person::P3, Number::Sg, Some(Gender::Neut), Case::Gen),
-    ("ihm", "es", Person::P3, Number::Sg, Some(Gender::Neut), Case::Dat),
-    ("es", "es", Person::P3, Number::Sg, Some(Gender::Neut), Case::Acc),
+    (
+        "es",
+        "es",
+        Person::P3,
+        Number::Sg,
+        Some(Gender::Neut),
+        Case::Nom,
+    ),
+    (
+        "seiner",
+        "es",
+        Person::P3,
+        Number::Sg,
+        Some(Gender::Neut),
+        Case::Gen,
+    ),
+    (
+        "ihm",
+        "es",
+        Person::P3,
+        Number::Sg,
+        Some(Gender::Neut),
+        Case::Dat,
+    ),
+    (
+        "es",
+        "es",
+        Person::P3,
+        Number::Sg,
+        Some(Gender::Neut),
+        Case::Acc,
+    ),
     // 1Pl (lemma: wir)
     ("wir", "wir", Person::P1, Number::Pl, None, Case::Nom),
     ("unser", "wir", Person::P1, Number::Pl, None, Case::Gen),
@@ -572,11 +656,39 @@ fn add_indefinite_pronouns(out: &mut Vec<ClosedClassEntry>) {
 // ---------------------------------------------------------------------------
 
 const CARDINAL_NUMERALS: &[&str] = &[
-    "null", "eins", "zwei", "drei", "vier", "fünf", "sechs", "sieben", "acht", "neun",
-    "zehn", "elf", "zwölf", "dreizehn", "vierzehn", "fünfzehn", "sechzehn", "siebzehn",
-    "achtzehn", "neunzehn",
-    "zwanzig", "dreißig", "vierzig", "fünfzig", "sechzig", "siebzig", "achtzig", "neunzig",
-    "hundert", "tausend", "Million", "Milliarde", "Billion",
+    "null",
+    "eins",
+    "zwei",
+    "drei",
+    "vier",
+    "fünf",
+    "sechs",
+    "sieben",
+    "acht",
+    "neun",
+    "zehn",
+    "elf",
+    "zwölf",
+    "dreizehn",
+    "vierzehn",
+    "fünfzehn",
+    "sechzehn",
+    "siebzehn",
+    "achtzehn",
+    "neunzehn",
+    "zwanzig",
+    "dreißig",
+    "vierzig",
+    "fünfzig",
+    "sechzig",
+    "siebzig",
+    "achtzig",
+    "neunzig",
+    "hundert",
+    "tausend",
+    "Million",
+    "Milliarde",
+    "Billion",
 ];
 
 fn add_numerals(out: &mut Vec<ClosedClassEntry>) {
@@ -604,15 +716,39 @@ fn add_numerals(out: &mut Vec<ClosedClassEntry>) {
 /// reuse the adjective paradigm generator and retag the output as
 /// `UPOS::NUM`.
 const ORDINAL_LEMMAS: &[&str] = &[
-    "erste", "zweite", "dritte", "vierte", "fünfte", "sechste", "siebte", "achte",
-    "neunte", "zehnte", "elfte", "zwölfte", "dreizehnte", "vierzehnte", "fünfzehnte",
-    "sechzehnte", "siebzehnte", "achtzehnte", "neunzehnte", "zwanzigste",
-    "dreißigste", "vierzigste", "fünfzigste", "sechzigste", "siebzigste",
-    "achtzigste", "neunzigste", "hundertste", "tausendste",
+    "erste",
+    "zweite",
+    "dritte",
+    "vierte",
+    "fünfte",
+    "sechste",
+    "siebte",
+    "achte",
+    "neunte",
+    "zehnte",
+    "elfte",
+    "zwölfte",
+    "dreizehnte",
+    "vierzehnte",
+    "fünfzehnte",
+    "sechzehnte",
+    "siebzehnte",
+    "achtzehnte",
+    "neunzehnte",
+    "zwanzigste",
+    "dreißigste",
+    "vierzigste",
+    "fünfzigste",
+    "sechzigste",
+    "siebzigste",
+    "achtzigste",
+    "neunzigste",
+    "hundertste",
+    "tausendste",
 ];
 
 fn add_ordinals(out: &mut Vec<ClosedClassEntry>) {
-    use crate::paradigm::adjective::{AdjectiveAttested, generate_adjective_paradigm};
+    use crate::paradigm::adjective::{generate_adjective_paradigm, AdjectiveAttested};
     for &lemma in ORDINAL_LEMMAS {
         let inputs = AdjectiveAttested {
             lemma,
@@ -688,18 +824,52 @@ fn add_compound_cardinals(out: &mut Vec<ClosedClassEntry>) {
 // ---------------------------------------------------------------------------
 
 /// Coordinating conjunctions (UPOS::CCONJ).
-const COORDINATING_CONJUNCTIONS: &[&str] =
-    &["und", "oder", "aber", "denn", "sondern", "doch", "sowie", "beziehungsweise", "bzw."];
+const COORDINATING_CONJUNCTIONS: &[&str] = &[
+    "und",
+    "oder",
+    "aber",
+    "denn",
+    "sondern",
+    "doch",
+    "sowie",
+    "beziehungsweise",
+    "bzw.",
+];
 
 /// Subordinating conjunctions (UPOS::SCONJ). Multi-word conjunctions
 /// (`ohne dass`, `statt dass`, `als ob`) are skipped — they require
 /// multi-token analysis, which is the parser's job, not the
 /// morphological lexicon's.
 const SUBORDINATING_CONJUNCTIONS: &[&str] = &[
-    "dass", "weil", "wenn", "als", "ob", "obwohl", "obgleich", "obschon", "obzwar",
-    "da", "während", "bevor", "ehe", "nachdem", "seitdem", "seit", "sobald", "solange",
-    "sooft", "falls", "sofern", "damit", "indem", "sodass", "sodaß", "anstatt",
-    "wohingegen", "wenngleich", "zumal",
+    "dass",
+    "weil",
+    "wenn",
+    "als",
+    "ob",
+    "obwohl",
+    "obgleich",
+    "obschon",
+    "obzwar",
+    "da",
+    "während",
+    "bevor",
+    "ehe",
+    "nachdem",
+    "seitdem",
+    "seit",
+    "sobald",
+    "solange",
+    "sooft",
+    "falls",
+    "sofern",
+    "damit",
+    "indem",
+    "sodass",
+    "sodaß",
+    "anstatt",
+    "wohingegen",
+    "wenngleich",
+    "zumal",
 ];
 
 fn add_conjunctions(out: &mut Vec<ClosedClassEntry>) {
@@ -727,20 +897,74 @@ fn add_conjunctions(out: &mut Vec<ClosedClassEntry>) {
 /// responsible for inferring case from context.
 const PREPOSITIONS: &[&str] = &[
     // Accusative
-    "für", "durch", "gegen", "ohne", "um", "bis", "wider", "entlang",
+    "für",
+    "durch",
+    "gegen",
+    "ohne",
+    "um",
+    "bis",
+    "wider",
+    "entlang",
     // Dative
-    "aus", "bei", "mit", "nach", "seit", "von", "zu", "gegenüber", "ab", "außer",
-    "binnen", "samt", "nebst", "dank",
+    "aus",
+    "bei",
+    "mit",
+    "nach",
+    "seit",
+    "von",
+    "zu",
+    "gegenüber",
+    "ab",
+    "außer",
+    "binnen",
+    "samt",
+    "nebst",
+    "dank",
     // Wechselpräpositionen (Acc OR Dat depending on motion/state)
-    "in", "an", "auf", "unter", "über", "hinter", "vor", "neben", "zwischen",
+    "in",
+    "an",
+    "auf",
+    "unter",
+    "über",
+    "hinter",
+    "vor",
+    "neben",
+    "zwischen",
     // Genitive
-    "während", "trotz", "wegen", "statt", "anstatt", "mittels", "kraft", "laut",
-    "infolge", "anlässlich", "oberhalb", "unterhalb", "jenseits", "diesseits",
-    "innerhalb", "außerhalb", "angesichts", "aufgrund", "zwecks", "betreffs",
-    "hinsichtlich", "ungeachtet",
+    "während",
+    "trotz",
+    "wegen",
+    "statt",
+    "anstatt",
+    "mittels",
+    "kraft",
+    "laut",
+    "infolge",
+    "anlässlich",
+    "oberhalb",
+    "unterhalb",
+    "jenseits",
+    "diesseits",
+    "innerhalb",
+    "außerhalb",
+    "angesichts",
+    "aufgrund",
+    "zwecks",
+    "betreffs",
+    "hinsichtlich",
+    "ungeachtet",
     // Common contractions written as separate "prepositions" in many
     // analyses (am = an + dem, im = in + dem, zum = zu + dem, etc.)
-    "am", "im", "zum", "zur", "ans", "ins", "vom", "beim", "aufs", "fürs",
+    "am",
+    "im",
+    "zum",
+    "zur",
+    "ans",
+    "ins",
+    "vom",
+    "beim",
+    "aufs",
+    "fürs",
 ];
 
 fn add_prepositions(out: &mut Vec<ClosedClassEntry>) {
@@ -770,19 +994,13 @@ fn add_prepositions(out: &mut Vec<ClosedClassEntry>) {
 /// - Misc (/ \ * & @ # % § ° ' ´ ` " ¿ ¡)
 const PUNCTUATION: &[&str] = &[
     // Sentence terminators
-    ".", "!", "?", "…",
-    // Clause separators
-    ",", ";", ":",
-    // Brackets
+    ".", "!", "?", "…", // Clause separators
+    ",", ";", ":", // Brackets
     "(", ")", "[", "]", "{", "}", "‹", "›", "«", "»",
     // Quotation marks (German + common ASCII)
-    "„", "\"", "‚", "'", "‟", "‛", "‘", "’", "“", "”",
-    // Dashes and hyphens
-    "-", "–", "—", "‐", "‑",
-    // Misc punctuation common in German text
-    "/", "\\", "*", "&", "@", "#", "%", "§", "°",
-    "´", "`",
-    "¿", "¡",
+    "„", "\"", "‚", "'", "‟", "‛", "‘", "’", "“", "”", // Dashes and hyphens
+    "-", "–", "—", "‐", "‑", // Misc punctuation common in German text
+    "/", "\\", "*", "&", "@", "#", "%", "§", "°", "´", "`", "¿", "¡",
     // Multi-character ellipsis variants
     "...",
 ];
@@ -907,29 +1125,71 @@ mod tests {
         let entries = generate_closed_class_entries();
         // er/sie/es Nom Sg.
         assert_eq!(
-            find_surfaces(&entries, UPOS::PRON, "er", Case::Nom, Number::Sg, Some(Gender::Masc)),
+            find_surfaces(
+                &entries,
+                UPOS::PRON,
+                "er",
+                Case::Nom,
+                Number::Sg,
+                Some(Gender::Masc)
+            ),
             vec!["er"]
         );
         assert_eq!(
-            find_surfaces(&entries, UPOS::PRON, "sie", Case::Nom, Number::Sg, Some(Gender::Fem)),
+            find_surfaces(
+                &entries,
+                UPOS::PRON,
+                "sie",
+                Case::Nom,
+                Number::Sg,
+                Some(Gender::Fem)
+            ),
             vec!["sie"]
         );
         assert_eq!(
-            find_surfaces(&entries, UPOS::PRON, "es", Case::Nom, Number::Sg, Some(Gender::Neut)),
+            find_surfaces(
+                &entries,
+                UPOS::PRON,
+                "es",
+                Case::Nom,
+                Number::Sg,
+                Some(Gender::Neut)
+            ),
             vec!["es"]
         );
         // Accusative er → ihn.
         assert_eq!(
-            find_surfaces(&entries, UPOS::PRON, "er", Case::Acc, Number::Sg, Some(Gender::Masc)),
+            find_surfaces(
+                &entries,
+                UPOS::PRON,
+                "er",
+                Case::Acc,
+                Number::Sg,
+                Some(Gender::Masc)
+            ),
             vec!["ihn"]
         );
         // Dative er → ihm; sie → ihr.
         assert_eq!(
-            find_surfaces(&entries, UPOS::PRON, "er", Case::Dat, Number::Sg, Some(Gender::Masc)),
+            find_surfaces(
+                &entries,
+                UPOS::PRON,
+                "er",
+                Case::Dat,
+                Number::Sg,
+                Some(Gender::Masc)
+            ),
             vec!["ihm"]
         );
         assert_eq!(
-            find_surfaces(&entries, UPOS::PRON, "sie", Case::Dat, Number::Sg, Some(Gender::Fem)),
+            find_surfaces(
+                &entries,
+                UPOS::PRON,
+                "sie",
+                Case::Dat,
+                Number::Sg,
+                Some(Gender::Fem)
+            ),
             vec!["ihr"]
         );
     }
@@ -937,9 +1197,8 @@ mod tests {
     #[test]
     fn definite_article_paradigm() {
         let entries = generate_closed_class_entries();
-        let der = |case, number, gender| {
-            find_surfaces(&entries, UPOS::DET, "der", case, number, gender)
-        };
+        let der =
+            |case, number, gender| find_surfaces(&entries, UPOS::DET, "der", case, number, gender);
         assert_eq!(der(Case::Nom, Number::Sg, Some(Gender::Masc)), vec!["der"]);
         assert_eq!(der(Case::Nom, Number::Sg, Some(Gender::Fem)), vec!["die"]);
         assert_eq!(der(Case::Nom, Number::Sg, Some(Gender::Neut)), vec!["das"]);
@@ -952,9 +1211,7 @@ mod tests {
         let entries = generate_closed_class_entries();
         let ein_pl_count = entries
             .iter()
-            .filter(|(_, a)| {
-                a.lemma == "ein" && a.features.number == Some(Number::Pl)
-            })
+            .filter(|(_, a)| a.lemma == "ein" && a.features.number == Some(Number::Pl))
             .count();
         assert_eq!(ein_pl_count, 0, "indefinite article should have no plural");
 
@@ -983,14 +1240,7 @@ mod tests {
     #[test]
     fn kein_paradigm_has_plural() {
         let entries = generate_closed_class_entries();
-        let s = find_surfaces(
-            &entries,
-            UPOS::DET,
-            "kein",
-            Case::Dat,
-            Number::Pl,
-            None,
-        );
+        let s = find_surfaces(&entries, UPOS::DET, "kein", Case::Dat, Number::Pl, None);
         assert_eq!(s, vec!["keinen"]);
         let s = find_surfaces(
             &entries,
@@ -1233,10 +1483,7 @@ mod tests {
     #[test]
     fn indefinite_man_only_nom() {
         let entries = generate_closed_class_entries();
-        let man: Vec<_> = entries
-            .iter()
-            .filter(|(_, a)| a.lemma == "man")
-            .collect();
+        let man: Vec<_> = entries.iter().filter(|(_, a)| a.lemma == "man").collect();
         assert_eq!(man.len(), 1);
         assert_eq!(man[0].1.features.case, Some(Case::Nom));
     }
@@ -1249,7 +1496,9 @@ mod tests {
             .filter(|(_, a)| a.pos == UPOS::NUM)
             .map(|(s, _)| s.as_str())
             .collect();
-        for expected in &["null", "eins", "zwei", "drei", "zehn", "zwanzig", "hundert", "tausend"] {
+        for expected in &[
+            "null", "eins", "zwei", "drei", "zehn", "zwanzig", "hundert", "tausend",
+        ] {
             assert!(nums.contains(expected), "missing numeral {expected}");
         }
     }

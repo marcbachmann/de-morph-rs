@@ -11,26 +11,18 @@
 //!   <https://creativecommons.org/licenses/by-sa/4.0/legalcode> § 3.a.
 
 use std::fs::File;
-use std::io::BufWriter;
-use std::io::Write;
+use std::io::{BufWriter, Write};
 use std::path::PathBuf;
 use std::time::Instant;
 
-use anyhow::Context;
-use anyhow::Result;
-use serde::Serialize;
-
-use de_morph::analysis::Case;
-use de_morph::analysis::Gender;
-use de_morph::analysis::Number;
-use de_morph::analysis::UPOS;
-use de_morph::analysis::Source;
-use de_morph::wiktionary::ExtractedEntry;
+use anyhow::{Context, Result};
+use de_morph::analysis::{Case, Gender, Number, Source, UPOS};
 use de_morph::wiktionary::dump::PageReader;
 use de_morph::wiktionary::noun::extract_nouns;
+use de_morph::wiktionary::ExtractedEntry;
+use serde::Serialize;
 
-const DEFAULT_INPUT: &str =
-    "data/wiktionary/raw/dewiktionary-20260601-pages-articles.xml.bz2";
+const DEFAULT_INPUT: &str = "data/wiktionary/raw/dewiktionary-20260601-pages-articles.xml.bz2";
 const DEFAULT_OUTPUT: &str = "data/wiktionary/processed/nouns.jsonl";
 const PROGRESS_EVERY: u64 = 50_000;
 
@@ -133,17 +125,11 @@ fn parse_args() -> Result<Args> {
         match argv[i].as_str() {
             "--input" => {
                 i += 1;
-                input = argv
-                    .get(i)
-                    .context("--input requires a value")?
-                    .into();
+                input = argv.get(i).context("--input requires a value")?.into();
             }
             "--output" => {
                 i += 1;
-                output = argv
-                    .get(i)
-                    .context("--output requires a value")?
-                    .into();
+                output = argv.get(i).context("--output requires a value")?.into();
             }
             "--limit" => {
                 i += 1;

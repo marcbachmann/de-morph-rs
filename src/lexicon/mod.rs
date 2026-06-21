@@ -29,4 +29,4 @@ pub mod load;
 
 pub use build::{is_clean_surface, BuildError, LexiconBuilder};
 pub use format::{AnalysisRecord, HEADER_SIZE, MAGIC};
-pub use load::{LoadError, Lexicon};
+pub use load::{Lexicon, LoadError};

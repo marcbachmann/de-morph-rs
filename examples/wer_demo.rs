@@ -6,9 +6,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("==== {s} ({} hits) ====", hits.len());
         for h in hits.iter().take(5) {
             print!("  {:<8} {:?}", h.lemma, h.pos);
-            if let Some(c) = h.features.case { print!(" {:?}", c); }
-            if let Some(n) = h.features.number { print!(" {:?}", n); }
-            if let Some(g) = h.features.gender { print!(" {:?}", g); }
+            if let Some(c) = h.features.case {
+                print!(" {:?}", c);
+            }
+            if let Some(n) = h.features.number {
+                print!(" {:?}", n);
+            }
+            if let Some(g) = h.features.gender {
+                print!(" {:?}", g);
+            }
             println!("  source={:?}", h.source);
         }
     }

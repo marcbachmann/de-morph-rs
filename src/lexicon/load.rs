@@ -12,7 +12,7 @@ use std::path::Path;
 
 use fst::Map as FstMap;
 
-use crate::analysis::{Analysis, Aux, Case, Gender, Number, PackedFeatures, UPOS, Source};
+use crate::analysis::{Analysis, Aux, Case, Gender, Number, PackedFeatures, Source, UPOS};
 use crate::lexicon::format::{
     unpack_fst_value, AnalysisRecord, Shape, ANALYSIS_RECORD_SIZE, HEADER_SIZE, MAGIC,
     SHAPE_ENTRY_SIZE, VERSION_MAJOR,
@@ -220,7 +220,9 @@ impl Lexicon {
         let mut shapes = Vec::with_capacity(num_shapes);
         for i in 0..num_shapes {
             let start = shape_table_offset + i * SHAPE_ENTRY_SIZE;
-            shapes.push(Shape::from_bytes(&side_bytes[start..start + SHAPE_ENTRY_SIZE]));
+            shapes.push(Shape::from_bytes(
+                &side_bytes[start..start + SHAPE_ENTRY_SIZE],
+            ));
         }
 
         Ok(Lexicon {
@@ -338,7 +340,8 @@ impl Lexicon {
         // the Hau+s spurious split, since "Haus" is its own lemma).
         if matches!(linker, "s" | "es") && combined_analyses.is_empty() {
             for a in &self.analyze(left) {
-                if a.lemma == left && a.pos == UPOS::NOUN && a.features.gender == Some(Gender::Fem) {
+                if a.lemma == left && a.pos == UPOS::NOUN && a.features.gender == Some(Gender::Fem)
+                {
                     return true;
                 }
             }
