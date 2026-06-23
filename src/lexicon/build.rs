@@ -36,6 +36,8 @@ pub enum BuildError {
     TooManyAnalysesPerSurface,
     /// More distinct analysis shapes than the 12-bit `shape_id` allows.
     TooManyShapes,
+    /// More distinct shape-sets than a `u32` shape_set_id can address.
+    TooManyShapeSets,
     /// Side-table size exceeds `u32::MAX` bytes.
     SideTableTooLarge,
 }
@@ -51,6 +53,7 @@ impl std::fmt::Display for BuildError {
                 write!(f, "more than u32::MAX analyses for one surface")
             }
             Self::TooManyShapes => write!(f, "more than 4096 distinct analysis shapes"),
+            Self::TooManyShapeSets => write!(f, "more than u32::MAX distinct shape-sets"),
             Self::SideTableTooLarge => write!(f, "side table exceeds 4 GiB"),
         }
     }
@@ -242,69 +245,128 @@ impl LexiconBuilder {
         }
         let num_shapes = u32::try_from(shapes.len()).map_err(|_| BuildError::TooManyShapes)?;
 
-        // Field widths derived from table sizes, recorded in the header so
-        // the loader unpacks identically.
-        let lemma_bits = bit_width(num_lemmas as usize);
-        let shape_bits = bit_width(shapes.len());
-
-        // Pass 2: bit-pack each surface's run (byte-aligned), factoring
-        // the lemma out — write lemma_id once per distinct lemma, marked
-        // by a 1-bit `new_lemma` flag on every reading after the first.
-        let mut groups = BitWriter::new();
-        let mut surface_spans: Vec<(String, u32, u64)> = Vec::with_capacity(per_surface.len());
+        // Group each surface's readings by lemma and intern the distinct
+        // shape-SETS. Readings are sorted by (lemma_id, shape_id), so a
+        // run of equal lemma_ids is one group whose shape_ids are already
+        // ascending; that shape-set is deduplicated across all surfaces
+        // and referenced by `shape_set_id`. ("großen"/"schönen" share a
+        // set, so only ~1k distinct sets exist.)
+        let mut set_ids: HashMap<Vec<u16>, u32> = HashMap::new();
+        let mut sets: Vec<Vec<u16>> = Vec::new();
+        let mut per_surface_groups: Vec<(String, Vec<(u32, u32)>)> =
+            Vec::with_capacity(per_surface.len());
         let mut total_readings: u64 = 0;
         for (surface, readings) in per_surface {
-            let count =
-                u32::try_from(readings.len()).map_err(|_| BuildError::TooManyAnalysesPerSurface)?;
-            let offset_in_analyses = groups.byte_len() as u64;
-            let mut prev_lemma = u32::MAX; // never a valid lemma_id (< 2^20)
-            for (i, &(lemma_id, shape_id)) in readings.iter().enumerate() {
-                if i == 0 {
-                    groups.write(lemma_id, lemma_bits);
-                } else if lemma_id == prev_lemma {
-                    groups.write(0, 1);
-                } else {
-                    groups.write(1, 1);
-                    groups.write(lemma_id, lemma_bits);
+            total_readings += readings.len() as u64;
+            let mut groups_vec: Vec<(u32, u32)> = Vec::new();
+            let mut i = 0usize;
+            while i < readings.len() {
+                let lemma_id = readings[i].0;
+                let mut set: Vec<u16> = Vec::new();
+                while i < readings.len() && readings[i].0 == lemma_id {
+                    set.push(readings[i].1);
+                    i += 1;
                 }
-                groups.write(shape_id as u32, shape_bits);
-                prev_lemma = lemma_id;
+                let set_id = match set_ids.get(&set) {
+                    Some(&id) => id,
+                    None => {
+                        let id =
+                            u32::try_from(sets.len()).map_err(|_| BuildError::TooManyShapeSets)?;
+                        sets.push(set.clone());
+                        set_ids.insert(set, id);
+                        id
+                    }
+                };
+                groups_vec.push((lemma_id, set_id));
+            }
+            per_surface_groups.push((surface, groups_vec));
+        }
+        let num_shape_sets = u32::try_from(sets.len()).map_err(|_| BuildError::TooManyShapeSets)?;
+
+        // Field widths (data-fit), recorded in the header so the loader
+        // unpacks identically.
+        let lemma_bits = bit_width(num_lemmas as usize);
+        let shape_bits = bit_width(shapes.len());
+        let set_id_bits = bit_width(sets.len());
+        let lemma_total_bytes: u64 = lemmas.iter().map(|s| s.len() as u64).sum();
+        let offset_bits = bit_width(lemma_total_bytes as usize + 1);
+
+        // Bit-pack each surface's run: per group `[lemma_id | shape_set_id]`,
+        // byte-aligned at the surface boundary.
+        let mut groups = BitWriter::new();
+        let mut surface_spans: Vec<(String, u32, u64)> =
+            Vec::with_capacity(per_surface_groups.len());
+        for (surface, groups_vec) in per_surface_groups {
+            let group_count = u32::try_from(groups_vec.len())
+                .map_err(|_| BuildError::TooManyAnalysesPerSurface)?;
+            let offset_in_groups = groups.byte_len() as u64;
+            for (lemma_id, set_id) in groups_vec {
+                groups.write(lemma_id, lemma_bits);
+                groups.write(set_id, set_id_bits);
             }
             groups.align();
-            total_readings += count as u64;
-            surface_spans.push((surface, count, offset_in_analyses));
+            surface_spans.push((surface, group_count, offset_in_groups));
         }
-        let analyses_bytes = groups.into_bytes();
+        let groups_bytes = groups.into_bytes();
 
+        // Bit-pack the lemma-offset table: (num_lemmas + 1) offsets, each
+        // `offset_bits` wide, relative to lemma_bytes.
+        let mut offsets = BitWriter::new();
+        let mut running: u32 = 0;
+        for lemma in &lemmas {
+            offsets.write(running, offset_bits);
+            running = running
+                .checked_add(lemma.len() as u32)
+                .ok_or(BuildError::SideTableTooLarge)?;
+        }
+        offsets.write(running, offset_bits); // sentinel = len(lemma_bytes)
+        let lemma_offsets_bytes_vec = offsets.into_bytes();
+
+        // Shape-set dictionary: (num_sets + 1) u32 offsets into a u16
+        // shape_id payload. Set `s` is payload[off[s]..off[s+1]].
+        let mut set_offset_bytes: Vec<u8> = Vec::with_capacity((sets.len() + 1) * 4);
+        let mut entry_cursor: u32 = 0;
+        for set in &sets {
+            set_offset_bytes.extend_from_slice(&entry_cursor.to_le_bytes());
+            entry_cursor = entry_cursor
+                .checked_add(set.len() as u32)
+                .ok_or(BuildError::SideTableTooLarge)?;
+        }
+        set_offset_bytes.extend_from_slice(&entry_cursor.to_le_bytes()); // sentinel
+        let mut set_payload_bytes: Vec<u8> = Vec::with_capacity(entry_cursor as usize * 2);
+        for set in &sets {
+            for &shape_id in set {
+                set_payload_bytes.extend_from_slice(&shape_id.to_le_bytes());
+            }
+        }
+        let set_dict_bytes = set_offset_bytes.len() + set_payload_bytes.len();
+
+        // ---- Section offsets.
         let lemma_offsets_offset = HEADER_SIZE as u64;
-        let lemma_offsets_bytes = (num_lemmas as u64 + 1) * 4;
-        let lemma_bytes_offset = lemma_offsets_offset + lemma_offsets_bytes;
-        let lemma_total_bytes: u64 = lemmas.iter().map(|s| s.len() as u64).sum();
+        let lemma_bytes_offset = lemma_offsets_offset + lemma_offsets_bytes_vec.len() as u64;
         let shape_table_offset = lemma_bytes_offset + lemma_total_bytes;
         let shape_table_bytes = num_shapes as u64 * SHAPE_ENTRY_SIZE as u64;
-        let analyses_offset = shape_table_offset + shape_table_bytes;
+        let shape_set_dict_offset = shape_table_offset + shape_table_bytes;
+        let analyses_offset = shape_set_dict_offset + set_dict_bytes as u64;
+        let analyses_end = analyses_offset + groups_bytes.len() as u64;
 
-        let num_analyses =
-            u32::try_from(total_readings).map_err(|_| BuildError::TooManyAnalyses)?;
-        let analyses_end = analyses_offset + analyses_bytes.len() as u64;
+        let num_analyses = u32::try_from(total_readings).map_err(|_| BuildError::TooManyAnalyses)?;
         let analyses_end_u32 =
             u32::try_from(analyses_end).map_err(|_| BuildError::SideTableTooLarge)?;
-        let lemma_offsets_offset_u32 = lemma_offsets_offset as u32;
-        let lemma_bytes_offset_u32 = lemma_bytes_offset as u32;
         let shape_table_offset_u32 =
             u32::try_from(shape_table_offset).map_err(|_| BuildError::SideTableTooLarge)?;
+        let shape_set_dict_offset_u32 =
+            u32::try_from(shape_set_dict_offset).map_err(|_| BuildError::SideTableTooLarge)?;
         let analyses_offset_u32 =
             u32::try_from(analyses_offset).map_err(|_| BuildError::SideTableTooLarge)?;
 
-        // Resolve per-surface absolute analysis offsets now that the
-        // shape table size is known. `surface_spans` preserves the
-        // BTreeMap's lexicographic order, so FST insertion stays sorted.
+        // FST: surface -> (group_count, absolute byte offset into groups).
         let mut fst_entries: Vec<(String, u64)> = Vec::with_capacity(surface_spans.len());
-        for (surface, count, offset_in_analyses) in surface_spans {
-            let absolute_offset = analyses_offset + offset_in_analyses;
+        for (surface, group_count, offset_in_groups) in surface_spans {
+            let absolute_offset = analyses_offset + offset_in_groups;
             let absolute_offset_u32 =
                 u32::try_from(absolute_offset).map_err(|_| BuildError::SideTableTooLarge)?;
-            fst_entries.push((surface, pack_fst_value(count, absolute_offset_u32)));
+            fst_entries.push((surface, pack_fst_value(group_count, absolute_offset_u32)));
         }
 
         // Build the FST.
@@ -323,41 +385,35 @@ impl LexiconBuilder {
         header[16..20].copy_from_slice(&0u32.to_le_bytes()); // flags
         header[20..24].copy_from_slice(&num_lemmas.to_le_bytes());
         header[24..28].copy_from_slice(&num_analyses.to_le_bytes());
-        header[28..32].copy_from_slice(&lemma_offsets_offset_u32.to_le_bytes());
-        header[32..36].copy_from_slice(&lemma_bytes_offset_u32.to_le_bytes());
+        header[28..32].copy_from_slice(&(lemma_offsets_offset as u32).to_le_bytes());
+        header[32..36].copy_from_slice(&(lemma_bytes_offset as u32).to_le_bytes());
         header[36..40].copy_from_slice(&analyses_offset_u32.to_le_bytes());
         header[40..44].copy_from_slice(&analyses_end_u32.to_le_bytes());
         header[44..48].copy_from_slice(&num_shapes.to_le_bytes());
         header[48..52].copy_from_slice(&shape_table_offset_u32.to_le_bytes());
         header[52] = lemma_bits as u8;
         header[53] = shape_bits as u8;
-        // bytes 54..64 are reserved (already zeroed).
+        header[54..58].copy_from_slice(&num_shape_sets.to_le_bytes());
+        header[58..62].copy_from_slice(&shape_set_dict_offset_u32.to_le_bytes());
+        header[62] = set_id_bits as u8;
+        header[63] = offset_bits as u8;
         side_out.write_all(&header)?;
 
-        // Lemma offsets: (num_lemmas + 1) * u32, each relative to
-        // lemma_bytes_offset.
-        let mut running: u32 = 0;
-        for lemma in &lemmas {
-            side_out.write_all(&running.to_le_bytes())?;
-            running = running
-                .checked_add(lemma.len() as u32)
-                .ok_or(BuildError::SideTableTooLarge)?;
-        }
-        // Sentinel for length of the last lemma.
-        side_out.write_all(&running.to_le_bytes())?;
-
-        // Lemma bytes.
+        // Lemma offsets (bit-packed).
+        side_out.write_all(&lemma_offsets_bytes_vec)?;
+        // Lemma bytes (verbatim, contiguous — borrowable zero-copy).
         for lemma in &lemmas {
             side_out.write_all(lemma.as_bytes())?;
         }
-
         // Shape table.
         for shape in &shapes {
             side_out.write_all(&shape.to_bytes())?;
         }
-
-        // Analyses.
-        side_out.write_all(&analyses_bytes)?;
+        // Shape-set dictionary: offsets then payload.
+        side_out.write_all(&set_offset_bytes)?;
+        side_out.write_all(&set_payload_bytes)?;
+        // Groups.
+        side_out.write_all(&groups_bytes)?;
         side_out.flush()?;
 
         Ok(BuildStats {
@@ -518,11 +574,11 @@ mod tests {
     }
 
     #[test]
-    fn multi_lemma_surface_toggles_new_lemma_flag() {
-        // One surface bearing two different lemmas exercises the
-        // new_lemma flag: reading 0 writes a lemma, a later reading flips
-        // the flag and re-reads. Readings are lemma-sorted, so the flag
-        // toggles 0 (same lemma) then 1 (new lemma).
+    fn multi_lemma_surface_decodes_all_groups() {
+        // One surface bearing two different lemmas becomes two groups
+        // `(lemma_id, shape_set_id)`; the decoder must read group_count
+        // groups and expand each set. Readings are lemma-sorted, so the
+        // two lemmas form two contiguous groups.
         let mut b = LexiconBuilder::new();
         b.add("Leiter", "Leiter", UPOS::NOUN, Features::noun(Gender::Fem), Source::Attested)
             .unwrap();
@@ -576,5 +632,55 @@ mod tests {
             Lexicon::from_bytes(fst, side),
             Err(crate::lexicon::load::LoadError::CorruptHeader { .. })
         ));
+    }
+
+    #[test]
+    fn corrupt_shape_set_offsets_rejected() {
+        // A non-monotonic shape-set offset table must be rejected at load,
+        // not panic on the live `analyze` slice. Three surfaces yield three
+        // distinct single-shape sets.
+        let mut b = LexiconBuilder::new();
+        for (sur, lemma, g, n, c) in [
+            ("Tisch", "Tisch", Gender::Masc, Number::Sg, Case::Nom),
+            ("Tische", "Tisch", Gender::Masc, Number::Pl, Case::Nom),
+            ("Frau", "Frau", Gender::Fem, Number::Sg, Case::Nom),
+        ] {
+            b.add(sur, lemma, UPOS::NOUN, Features::noun_form(g, n, c), Source::Attested)
+                .unwrap();
+        }
+        let mut fst = Vec::new();
+        let mut side = Vec::new();
+        let stats = b.finish(&mut fst, &mut side).unwrap();
+        assert!(stats.num_analyses >= 3);
+        // shape_set_dict_offset lives at header bytes 58..62; overwrite the
+        // first set offset with a huge value -> non-monotonic.
+        let dict_off = u32::from_le_bytes(side[58..62].try_into().unwrap()) as usize;
+        side[dict_off..dict_off + 4].copy_from_slice(&u32::MAX.to_le_bytes());
+        assert!(matches!(
+            Lexicon::from_bytes(fst, side),
+            Err(crate::lexicon::load::LoadError::CorruptHeader { .. })
+        ));
+    }
+
+    #[test]
+    fn corrupt_section_offset_errors_without_panicking() {
+        // shape_table_offset < lemma_bytes_offset must be caught (checked
+        // subtraction) rather than panicking in debug / wrapping in release.
+        let mut b = LexiconBuilder::new();
+        b.add(
+            "Tisch",
+            "Tisch",
+            UPOS::NOUN,
+            Features::noun_form(Gender::Masc, Number::Sg, Case::Nom),
+            Source::Attested,
+        )
+        .unwrap();
+        let mut fst = Vec::new();
+        let mut side = Vec::new();
+        b.finish(&mut fst, &mut side).unwrap();
+        // lemma_bytes_offset @32..36, shape_table_offset @48..52.
+        let lbo = u32::from_le_bytes(side[32..36].try_into().unwrap());
+        side[48..52].copy_from_slice(&(lbo - 1).to_le_bytes());
+        assert!(Lexicon::from_bytes(fst, side).is_err());
     }
 }

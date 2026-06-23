@@ -15,8 +15,8 @@ use fst::Map as FstMap;
 
 use crate::analysis::{Analysis, Aux, Case, Gender, Number, PackedFeatures, Source, UPOS};
 use crate::lexicon::format::{
-    bit_width, unpack_fst_value, AnalysisRecord, BitReader, Shape, HEADER_SIZE, MAGIC,
-    SHAPE_ENTRY_SIZE, VERSION_MAJOR,
+    bit_width, read_packed_u32, unpack_fst_value, AnalysisRecord, BitReader, Shape, HEADER_SIZE,
+    MAGIC, SHAPE_ENTRY_SIZE, VERSION_MAJOR,
 };
 
 /// Errors raised when loading a lexicon.
@@ -168,13 +168,18 @@ pub struct Lexicon {
     num_lemmas: usize,
     #[allow(dead_code)]
     num_analyses: usize,
-    /// Bit widths of the packed `lemma_id` / `shape_id` fields, read from
-    /// the header. Derived at build time from the table sizes.
+    /// Bit widths of the packed group fields and lemma offsets, read from
+    /// the header (each a deterministic function of a table size).
     lemma_bits: u32,
-    shape_bits: u32,
-    /// Interned analysis shapes, decoded once at load and indexed by the
-    /// `shape_id` in each record.
+    set_id_bits: u32,
+    offset_bits: u32,
+    /// Interned analysis shapes, indexed by `shape_id`.
     shapes: Vec<Shape>,
+    /// Shape-set dictionary: set `s` is
+    /// `set_shapes[set_offsets[s] as usize..set_offsets[s + 1] as usize]`.
+    set_offsets: Vec<u32>,
+    set_shapes: Vec<u16>,
+    num_shape_sets: usize,
 }
 
 impl Lexicon {
@@ -234,40 +239,93 @@ impl Lexicon {
             u32::from_le_bytes(side_bytes[48..52].try_into().unwrap()) as usize;
         let lemma_bits = side_bytes[52] as u32;
         let shape_bits = side_bytes[53] as u32;
+        let num_shape_sets = u32::from_le_bytes(side_bytes[54..58].try_into().unwrap()) as usize;
+        let shape_set_dict_offset =
+            u32::from_le_bytes(side_bytes[58..62].try_into().unwrap()) as usize;
+        let set_id_bits = side_bytes[62] as u32;
+        let offset_bits = side_bytes[63] as u32;
 
         if side_bytes.len() < analyses_end {
             return Err(LoadError::Truncated {
                 field: "analyses end",
             });
         }
-        if lemma_offsets_offset + (num_lemmas + 1) * 4 > lemma_bytes_offset {
+        // Bit-packed lemma offsets occupy ceil((num_lemmas+1)*offset_bits/8).
+        let lemma_offsets_bytes = ((num_lemmas + 1) * offset_bits as usize).div_ceil(8);
+        if lemma_offsets_offset + lemma_offsets_bytes > lemma_bytes_offset {
             return Err(LoadError::Truncated {
                 field: "lemma offsets",
             });
         }
         let shape_table_end = shape_table_offset + num_shapes * SHAPE_ENTRY_SIZE;
-        if shape_table_end > analyses_offset || analyses_offset > side_bytes.len() {
+        if shape_table_end > shape_set_dict_offset {
             return Err(LoadError::Truncated {
                 field: "shape table",
             });
         }
-        // The packed-field widths are a deterministic function of the
-        // table sizes. Validate the stored header bytes match, so a
-        // corrupt/mis-built width can't silently mis-decode every record.
+        let set_offsets_bytes = (num_shape_sets + 1) * 4;
+        if shape_set_dict_offset + set_offsets_bytes > analyses_offset
+            || analyses_offset > side_bytes.len()
+        {
+            return Err(LoadError::Truncated {
+                field: "shape-set dict",
+            });
+        }
+
+        // Validate packed-field widths against the table sizes they derive
+        // from, so a corrupt/mis-built width can't silently mis-decode.
         if lemma_bits != bit_width(num_lemmas) {
             return Err(LoadError::CorruptHeader { field: "lemma_bits" });
         }
         if shape_bits != bit_width(num_shapes) {
             return Err(LoadError::CorruptHeader { field: "shape_bits" });
         }
+        if set_id_bits != bit_width(num_shape_sets) {
+            return Err(LoadError::CorruptHeader { field: "set_id_bits" });
+        }
+        let lemma_bytes_len = shape_table_offset
+            .checked_sub(lemma_bytes_offset)
+            .ok_or(LoadError::Truncated { field: "lemma bytes" })?;
+        if offset_bits != bit_width(lemma_bytes_len + 1) {
+            return Err(LoadError::CorruptHeader { field: "offset_bits" });
+        }
 
-        // Decode the shape table once (a few hundred entries).
+        // Decode the shape table (a few hundred entries).
         let mut shapes = Vec::with_capacity(num_shapes);
         for i in 0..num_shapes {
             let start = shape_table_offset + i * SHAPE_ENTRY_SIZE;
             shapes.push(Shape::from_bytes(
                 &side_bytes[start..start + SHAPE_ENTRY_SIZE],
             ));
+        }
+
+        // Decode the shape-set dictionary: (num_shape_sets + 1) u32 offsets,
+        // then a u16 shape_id payload.
+        let mut set_offsets = Vec::with_capacity(num_shape_sets + 1);
+        for i in 0..=num_shape_sets {
+            let p = shape_set_dict_offset + i * 4;
+            set_offsets.push(u32::from_le_bytes(side_bytes[p..p + 4].try_into().unwrap()));
+        }
+        // Offsets must be monotonic non-decreasing so every set's slice
+        // [off[s], off[s+1]) is valid and within the payload (whose length
+        // is the sentinel `off[num_shape_sets]`). Reject a forged/corrupt
+        // dictionary here rather than panicking on the live `analyze` path.
+        if set_offsets.windows(2).any(|w| w[0] > w[1]) {
+            return Err(LoadError::CorruptHeader {
+                field: "shape-set offsets",
+            });
+        }
+        let payload_start = shape_set_dict_offset + set_offsets_bytes;
+        let num_entries = *set_offsets.last().unwrap_or(&0) as usize;
+        if payload_start + num_entries * 2 > analyses_offset {
+            return Err(LoadError::Truncated {
+                field: "shape-set payload",
+            });
+        }
+        let mut set_shapes = Vec::with_capacity(num_entries);
+        for i in 0..num_entries {
+            let p = payload_start + i * 2;
+            set_shapes.push(u16::from_le_bytes(side_bytes[p..p + 2].try_into().unwrap()));
         }
 
         Ok(Lexicon {
@@ -280,8 +338,12 @@ impl Lexicon {
             num_lemmas,
             num_analyses,
             lemma_bits,
-            shape_bits,
+            set_id_bits,
+            offset_bits,
             shapes,
+            set_offsets,
+            set_shapes,
+            num_shape_sets,
         })
     }
 
@@ -612,31 +674,37 @@ impl Lexicon {
             Some(v) => v,
             None => return Vec::new(),
         };
-        let (count, abs_offset) = unpack_fst_value(packed);
-        let mut out = Vec::with_capacity(count as usize);
+        let (group_count, abs_offset) = unpack_fst_value(packed);
+        let mut out = Vec::new();
         let start = abs_offset as usize;
         if start < self.analyses_offset || start > self.analyses_end {
-            // Corrupt index pointing outside the analyses section — return
-            // empty rather than decode header/lemma/shape bytes as records.
+            // Corrupt index pointing outside the groups section — return
+            // empty rather than decode header/lemma bytes as groups.
             return out;
         }
-        // Decode the surface's bit-packed, lemma-factored run. Reading 0
-        // carries an explicit lemma_id; each later reading carries a
-        // 1-bit `new_lemma` flag and only re-reads the lemma when it
-        // changes. The reader yields zeros past the section end, and
-        // `materialise` rejects out-of-range ids, so a corrupt index
-        // degrades gracefully rather than panicking.
+        // Decode the surface's `group_count` `(lemma_id, shape_set_id)`
+        // groups, expanding each set into its shape_ids. The reader yields
+        // zeros past the section end and `materialise` rejects out-of-range
+        // ids, so a corrupt index degrades gracefully rather than panicking.
         let mut reader = BitReader::new(&self.side, start);
-        let mut lemma_id = 0u32;
-        for i in 0..count {
-            if i == 0 || reader.read(1) == 1 {
-                lemma_id = reader.read(self.lemma_bits);
+        for _ in 0..group_count {
+            let lemma_id = reader.read(self.lemma_bits);
+            let set_id = reader.read(self.set_id_bits) as usize;
+            if set_id >= self.num_shape_sets {
+                break; // corrupt set id
             }
-            let shape_id = reader.read(self.shape_bits) as u16;
-            let rec = AnalysisRecord { lemma_id, shape_id };
-            match self.materialise(&rec) {
-                Ok(a) => out.push(a),
-                Err(_) => continue,
+            let from = self.set_offsets[set_id] as usize;
+            let to = self.set_offsets[set_id + 1] as usize;
+            // `set_offsets` is validated monotonic and bounded at load, so
+            // this slice is always valid; `get` keeps the documented
+            // graceful-degradation guarantee even against that.
+            let shapes = self.set_shapes.get(from..to).unwrap_or(&[]);
+            for &shape_id in shapes {
+                let rec = AnalysisRecord { lemma_id, shape_id };
+                match self.materialise(&rec) {
+                    Ok(a) => out.push(a),
+                    Err(_) => continue,
+                }
             }
         }
         out
@@ -700,12 +768,10 @@ impl Lexicon {
                 field: "lemma id out of range",
             });
         }
-        let off_start = self.lemma_offsets_offset + id * 4;
-        let off_end = off_start + 4;
-        let start = u32::from_le_bytes(self.side[off_start..off_end].try_into().unwrap()) as usize;
-        let next_off_start = off_end;
-        let next_off_end = next_off_start + 4;
-        let end = u32::from_le_bytes(self.side[next_off_start..next_off_end].try_into().unwrap())
+        // Offsets are bit-packed at `offset_bits`; read element id and id+1.
+        let start =
+            read_packed_u32(&self.side, self.lemma_offsets_offset, id, self.offset_bits) as usize;
+        let end = read_packed_u32(&self.side, self.lemma_offsets_offset, id + 1, self.offset_bits)
             as usize;
         let bytes_start = self.lemma_bytes_offset + start;
         let bytes_end = self.lemma_bytes_offset + end;

@@ -10,7 +10,7 @@
 //! ```text
 //!   [header                                              : 64 bytes]
 //!     magic                       : [u8; 12]   "DE-MORPH-RS\0"
-//!     version_major               : u16        = 6        (offset 12)
+//!     version_major               : u16        = 7        (offset 12)
 //!     version_minor               : u16        = 0        (offset 14)
 //!     flags                       : u32        reserved   (offset 16)
 //!     num_lemmas                  : u32                   (offset 20)
@@ -23,60 +23,60 @@
 //!     shape_table_offset          : u32                   (offset 48)
 //!     lemma_bits                  : u8         bit width of a lemma_id (offset 52)
 //!     shape_bits                  : u8         bit width of a shape_id (offset 53)
-//!     _reserved                   : [u8; 10]   zeroed     (offset 54)
+//!     num_shape_sets              : u32        distinct shape-sets (offset 54)
+//!     shape_set_dict_offset       : u32                   (offset 58)
+//!     set_id_bits                 : u8         bit width of a shape_set_id (offset 62)
+//!     offset_bits                 : u8         bit width of a lemma byte offset (offset 63)
 //!
-//!   [lemma_offsets section                : 4 * (num_lemmas + 1) bytes]
-//!     u32 offset for lemma 0, 1, ..., num_lemmas
-//!     The (num_lemmas)-th entry is a sentinel: it equals the length
-//!     of `lemma_bytes`. Each offset is relative to `lemma_bytes_offset`.
+//!   [lemma_offsets section   : ceil((num_lemmas + 1) * offset_bits / 8) bytes]
+//!     Bit-packed (LSB-first) array of (num_lemmas + 1) offsets, each
+//!     `offset_bits` wide, relative to `lemma_bytes_offset`. The last is a
+//!     sentinel equal to `len(lemma_bytes)`. Lemma N spans
+//!     [offset[N], offset[N+1]).
 //!
 //!   [lemma_bytes section                  : variable]
-//!     UTF-8 bytes of all lemmas concatenated. Length of lemma N is
-//!     `lemma_offsets[N+1] - lemma_offsets[N]`.
+//!     UTF-8 bytes of all lemmas concatenated, verbatim and contiguous so
+//!     the loader can hand back borrowed &str (zero-copy lemmas).
 //!
 //!   [shape table                 : SHAPE_ENTRY_SIZE * num_shapes bytes]
 //!     Interned analysis "shapes" — the (pos, source, aux,
-//!     packed_features) tuple, i.e. everything an analysis carries
-//!     EXCEPT the lemma. Only a few hundred distinct shapes exist across
-//!     the whole corpus, so analyses reference one by a small id instead
-//!     of repeating ~40 bits per record. See `Shape` below.
+//!     packed_features) tuple, everything an analysis carries EXCEPT the
+//!     lemma. A few hundred distinct shapes; referenced by `shape_id`.
+//!
+//!   [shape-set dictionary]
+//!     The distinct shape-SETS, deduplicated. A surface's analyses for one
+//!     lemma form a set of shape_ids governed by the inflection pattern,
+//!     not the lemma ("großen"/"schönen" share one set), so only ~1k
+//!     distinct sets exist across the corpus. Layout:
+//!       set_offsets : (num_shape_sets + 1) u16   indices into payload
+//!       payload     : sum(|set|) u16             shape_ids; set `s` is
+//!                                                 payload[off[s]..off[s+1]]
 //!
 //!   [analyses (groups) section   : variable, bit-packed]
-//!     Per surface, a byte-aligned, LSB-first bit-packed run of its
-//!     analyses, grouped by lemma. See "v6 group encoding" below. The
-//!     FST value `(count, byte_offset)` gives a surface's reading count
-//!     and the byte offset of its run within this section.
+//!     Per surface, a byte-aligned LSB-first run of its (lemma, shape-set)
+//!     groups. The FST value `(group_count, byte_offset)` gives a
+//!     surface's group count and the byte offset of its run. See "v7
+//!     group encoding" below.
 //! ```
 //!
-//! # v6 group encoding (lemma-factored, bit-packed)
+//! # v7 group encoding (lemma- and shape-set-factored)
 //!
-//! A surface's analyses almost always share one lemma (99%+ of
-//! surfaces) and differ only in shape. v5 stored `lemma_id` in every
-//! 4-byte record, repeating the high-entropy half ~4× per surface. v6
-//! factors the lemma out: per surface, the readings are sorted by
-//! `(lemma_id, shape_id)` and emitted so a lemma_id is written once per
-//! distinct lemma rather than once per reading.
-//!
-//! Field widths are data-fit and recorded in the header:
-//!   `lemma_bits = bit_width(num_lemmas)`, `shape_bits = bit_width(num_shapes)`.
-//! For the current lexicon that is 18 and 10 bits (vs the 20/12 maxima).
-//!
-//! Per surface (`count` readings, the FST value's high half), bits are
-//! written LSB-first, then byte-aligned:
+//! v6 factored the lemma out of each group but still stored that group's
+//! explicit list of shape_ids. v7 also interns the shape-SET, so each
+//! group is just two indices, written LSB-first then byte-aligned per
+//! surface:
 //!
 //! ```text
-//!   reading 0 :                       lemma_id : lemma_bits
-//!                                      shape_id : shape_bits
-//!   reading i :  new_lemma : 1 bit
-//!                (if new)             lemma_id : lemma_bits
-//!                                      shape_id : shape_bits
+//!   per group :  lemma_id      : lemma_bits
+//!                shape_set_id  : set_id_bits
 //! ```
 //!
-//! `new_lemma = 1` iff this reading's lemma differs from the previous
-//! reading's; because readings are lemma-sorted, that is exactly once
-//! per distinct lemma. The decoder carries the current lemma forward
-//! when the bit is 0. Random access is preserved: the FST offset seeks
-//! straight to the surface's byte-aligned run.
+//! 99%+ of surfaces are a single group (single lemma). The decoder reads
+//! `group_count` groups from the surface's byte-aligned run; for each it
+//! expands `shape_set_id` via the dictionary into that group's shape_ids
+//! and emits one analysis per (lemma_id, shape_id). Field widths are
+//! data-fit and recorded in the header. Random access is preserved: the
+//! FST offset seeks straight to the surface's run.
 //!
 //! Each shape-table entry is 6 little-endian bytes:
 //!
@@ -86,11 +86,10 @@
 //!   byte  5      source (bits 0-1) | aux (bits 2-3)
 //! ```
 //!
-//! History: v5 introduced the shape table (interning the
-//! (pos, source, aux, packed_features) tuple), shrinking each record to
-//! a 4-byte `(lemma_id|shape_id)` pair. v4 stored the full analysis in
-//! 8 bytes; v3 widened POS from 4→5 bits for the 17th UPOS tag
-//! (`Propn`). v6 keeps the shape table and adds lemma-factoring.
+//! History: v6 lemma-factored each group + bit-packed (lemma_id once per
+//! distinct lemma + a new_lemma flag). v5 introduced the shape table; v3
+//! widened POS 4→5 bits for `Propn`. v7 adds shape-set interning and
+//! bit-packs the lemma-offset table.
 
 /// File magic, including a trailing null byte so the length is 12.
 pub const MAGIC: [u8; 12] = *b"DE-MORPH-RS\0";
@@ -98,12 +97,13 @@ pub const MAGIC: [u8; 12] = *b"DE-MORPH-RS\0";
 /// Fixed header size.
 pub const HEADER_SIZE: usize = 64;
 
-/// Current format version. v6 lemma-factors the analyses section: per
-/// surface, readings are grouped by lemma and bit-packed, writing a
-/// lemma_id once per distinct lemma instead of once per reading. v5
-/// interned the (pos, source, aux, features) shape; v3 widened POS 4→5
-/// bits for `Propn`; v2 packed the v1 12-byte record to 8 bytes.
-pub const VERSION_MAJOR: u16 = 6;
+/// Current format version. v7 interns shape-SETS: each (surface, lemma)
+/// group is a `(lemma_id, shape_set_id)` pair, with the distinct shape
+/// lists deduplicated into a small dictionary; it also bit-packs the
+/// lemma-offset table. v6 lemma-factored the analyses section; v5 interned
+/// the (pos, source, aux, features) shape; v3 widened POS 4→5 bits for
+/// `Propn`; v2 packed the v1 12-byte record to 8 bytes.
+pub const VERSION_MAJOR: u16 = 7;
 pub const VERSION_MINOR: u16 = 0;
 
 /// Size of the logical analysis record (`lemma_id | shape_id`) as a
@@ -226,6 +226,31 @@ pub fn bit_width(num_values: usize) -> u32 {
     } else {
         (num_values as u64 - 1).ilog2() + 1
     }
+}
+
+/// Random-access read of the `index`-th `width`-bit value from a
+/// contiguous LSB-first packed array beginning at byte `base` (matches
+/// the layout [`BitWriter`] produces when values are written in order).
+/// `width` 0 always yields 0. Bytes past the end read as 0.
+#[inline]
+pub fn read_packed_u32(data: &[u8], base: usize, index: usize, width: u32) -> u32 {
+    if width == 0 {
+        return 0;
+    }
+    let start_bit = index * width as usize;
+    let mut byte = base + start_bit / 8;
+    let mut bit_in_byte = (start_bit % 8) as u32;
+    let mut acc: u64 = 0;
+    let mut got: u32 = 0;
+    while got < width {
+        let b = (data.get(byte).copied().unwrap_or(0) as u64) >> bit_in_byte;
+        acc |= b << got;
+        got += 8 - bit_in_byte;
+        bit_in_byte = 0;
+        byte += 1;
+    }
+    let mask = if width == 32 { u64::MAX } else { (1u64 << width) - 1 };
+    (acc & mask) as u32
 }
 
 /// LSB-first bit writer. The first bits written occupy the low-order
@@ -387,6 +412,27 @@ mod tests {
         let mut r = BitReader::new(&bytes, 0);
         assert_eq!(r.read(8), 0xFF);
         assert_eq!(r.read(8), 0); // past end
+    }
+
+    #[test]
+    fn read_packed_u32_random_access_matches_sequential_pack() {
+        // Pack a sequence of values at a fixed width, with a leading
+        // section of padding bytes to exercise a non-zero base.
+        let width = 21u32;
+        let values: Vec<u32> = (0..50).map(|i| (i * 40_000 + 7) % (1 << 21)).collect();
+        let base = 3usize;
+        let mut w = BitWriter::new();
+        for v in &values {
+            w.write(*v, width);
+        }
+        let packed = w.into_bytes();
+        let mut data = vec![0xAAu8; base];
+        data.extend_from_slice(&packed);
+        for (i, v) in values.iter().enumerate() {
+            assert_eq!(read_packed_u32(&data, base, i, width), *v, "index {i}");
+        }
+        // width 0 always reads 0.
+        assert_eq!(read_packed_u32(&data, base, 5, 0), 0);
     }
 
     #[test]
