@@ -82,7 +82,7 @@ fn strictly_indeclinable_entry(title: &str) -> ExtractedEntry {
             degree: Some(Degree::Pos),
             ..Features::empty()
         },
-        source: Source::Lexicon,
+        source: Source::Attested,
         source_title: title.to_string(),
     }
 }
@@ -177,7 +177,7 @@ mod tests {
             })
             .unwrap();
         assert_eq!(strong_nom_masc_pos.surface, "lieber");
-        assert_eq!(strong_nom_masc_pos.source, Source::Generated);
+        assert_eq!(strong_nom_masc_pos.source, Source::Inflected);
 
         let weak_dat_pl_sup = entries
             .iter()

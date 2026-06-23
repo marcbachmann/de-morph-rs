@@ -53,7 +53,7 @@ pub fn extract_adverbs(title: &str, page_text: &str) -> Vec<ExtractedEntry> {
         lemma: title.to_string(),
         pos: UPOS::ADV,
         features,
-        source: Source::Lexicon,
+        source: Source::Attested,
         source_title: title.to_string(),
     }]
 }
@@ -179,7 +179,7 @@ pub fn extract_particles(title: &str, page_text: &str) -> Vec<ExtractedEntry> {
         lemma: title.to_string(),
         pos: UPOS::PART,
         features: Features::empty(),
-        source: Source::Lexicon,
+        source: Source::Attested,
         source_title: title.to_string(),
     }]
 }
@@ -230,7 +230,7 @@ mod tests {
         assert_eq!(entries[0].surface, "heute");
         assert_eq!(entries[0].lemma, "heute");
         assert_eq!(entries[0].pos, UPOS::ADV);
-        assert_eq!(entries[0].source, Source::Lexicon);
+        assert_eq!(entries[0].source, Source::Attested);
     }
 
     #[test]

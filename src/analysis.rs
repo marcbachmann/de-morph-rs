@@ -258,8 +258,8 @@ pub enum PronType {
 /// applications, lexicon-or-rule for normal text processing, anything for
 /// best-effort highlighting).
 ///
-/// The numeric ordering is from highest trust (`Lexicon = 0`) to lowest
-/// (`Guessed = 2`), so `Source::min(a, b)` returns the more trusted one.
+/// The numeric ordering is from highest trust (`Attested = 0`) to lowest
+/// (`Predicted = 3`), so `Source::min(a, b)` returns the more trusted one.
 ///
 /// There is intentionally no `Default`: an analysis's provenance is never
 /// "unknown by omission", so every construction site sets `source`
@@ -269,15 +269,20 @@ pub enum PronType {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(u8)]
 pub enum Source {
-    /// Attested in the lexicon (i.e. extracted from Wiktionary, hand-curated,
-    /// etc.). Highest trust.
-    Lexicon = 0,
-    /// Produced by paradigm rules from a known lemma. The lemma is in the
-    /// lexicon; this particular form is rule-generated rather than attested.
-    Generated = 1,
-    /// Out-of-vocabulary: the lemma itself is unknown, and the analysis
-    /// comes from a suffix-based guesser plus paradigm rules.
-    Guessed = 2,
+    /// Recorded in the lexicon: extracted from Wiktionary or hand-curated.
+    /// Highest trust.
+    Attested = 0,
+    /// Rule-inflected form of an attested lemma. The lemma is in the
+    /// lexicon; this particular surface form is produced by paradigm rules
+    /// rather than directly attested, so it may over-generate.
+    Inflected = 1,
+    /// Compound synthesised from parts that are all in the lexicon, but
+    /// never attested as a whole word. More trustworthy than `Predicted`
+    /// (every part is a known word), less than a directly attested form.
+    Composed = 2,
+    /// Out-of-vocabulary: the lemma itself is unknown, analysed by a
+    /// suffix-based guesser plus paradigm rules. Lowest trust.
+    Predicted = 3,
 }
 
 /// Morphological features attached to an analysis.
@@ -533,10 +538,10 @@ pub struct Analysis {
 }
 
 impl Analysis {
-    /// Construct an analysis tagged as [`Source::Lexicon`] (the common case
+    /// Construct an analysis tagged as [`Source::Attested`] (the common case
     /// for code that already validated the lemma came from the lexicon).
     pub fn new(lemma: impl Into<String>, pos: UPOS, features: Features) -> Self {
-        Self::with_source(lemma, pos, features, Source::Lexicon)
+        Self::with_source(lemma, pos, features, Source::Attested)
     }
 
     /// Construct an analysis with an explicit source tag.

@@ -148,7 +148,7 @@ fn parse_vorname_cells(
                         gender,
                         ..Features::empty()
                     },
-                    source: Source::Lexicon,
+                    source: Source::Attested,
                     source_title: title.to_string(),
                 });
             }
@@ -173,7 +173,7 @@ fn canonical_propn_paradigm(title: &str, gender: Option<Gender>) -> Vec<Extracte
             gender,
             ..Features::empty()
         },
-        source: Source::Lexicon,
+        source: Source::Attested,
         source_title: title.to_string(),
     };
     out.push(make(title.to_string(), Case::Nom));

@@ -612,9 +612,10 @@ impl Lexicon {
             other => return Err(LoadError::InvalidPos(other)),
         };
         let source = match shape.source {
-            0 => Source::Lexicon,
-            1 => Source::Generated,
-            2 => Source::Guessed,
+            0 => Source::Attested,
+            1 => Source::Inflected,
+            2 => Source::Composed,
+            3 => Source::Predicted,
             other => return Err(LoadError::InvalidSource(other)),
         };
         let mut features = PackedFeatures(shape.packed_features).unpack();
@@ -702,7 +703,7 @@ mod tests {
                 "Tisch",
                 UPOS::NOUN,
                 Features::noun_form(Gender::Masc, num, case),
-                Source::Lexicon,
+                Source::Attested,
             )
             .unwrap();
         }
@@ -718,7 +719,7 @@ mod tests {
                 "Frau",
                 UPOS::NOUN,
                 Features::noun_form(Gender::Fem, num, case),
-                Source::Lexicon,
+                Source::Attested,
             )
             .unwrap();
         }
@@ -765,7 +766,7 @@ mod tests {
                 surface,
                 UPOS::NOUN,
                 Features::noun_form(Gender::Masc, Number::Sg, Case::Nom),
-                Source::Lexicon,
+                Source::Attested,
             )
             .unwrap();
         }
@@ -803,7 +804,7 @@ mod tests {
                 surface,
                 UPOS::NOUN,
                 Features::noun_form(Gender::Masc, Number::Sg, Case::Nom),
-                Source::Lexicon,
+                Source::Attested,
             )
             .unwrap();
         }
@@ -813,7 +814,7 @@ mod tests {
             "Bund",
             UPOS::NOUN,
             Features::noun_form(Gender::Masc, Number::Sg, Case::Gen),
-            Source::Lexicon,
+            Source::Attested,
         )
         .unwrap();
         let mut fst = Vec::new();
@@ -843,7 +844,7 @@ mod tests {
                 surface,
                 UPOS::NOUN,
                 Features::noun_form(Gender::Masc, Number::Sg, Case::Nom),
-                Source::Lexicon,
+                Source::Attested,
             )
             .unwrap();
         }
@@ -880,7 +881,7 @@ mod tests {
             "Bund",
             UPOS::NOUN,
             Features::noun_form(Gender::Masc, Number::Sg, Case::Nom),
-            Source::Lexicon,
+            Source::Attested,
         )
         .unwrap();
         b.add(
@@ -888,7 +889,7 @@ mod tests {
             "Bund",
             UPOS::NOUN,
             Features::noun_form(Gender::Masc, Number::Sg, Case::Dat),
-            Source::Lexicon,
+            Source::Attested,
         )
         .unwrap();
         b.add(
@@ -896,7 +897,7 @@ mod tests {
             "Stag",
             UPOS::NOUN,
             Features::noun_form(Gender::Masc, Number::Sg, Case::Nom),
-            Source::Lexicon,
+            Source::Attested,
         )
         .unwrap();
         let mut fst = Vec::new();
@@ -922,7 +923,7 @@ mod tests {
             "Bund",
             UPOS::NOUN,
             Features::noun_form(Gender::Masc, Number::Sg, Case::Nom),
-            Source::Lexicon,
+            Source::Attested,
         )
         .unwrap();
         b.add(
@@ -930,7 +931,7 @@ mod tests {
             "Bund",
             UPOS::NOUN,
             Features::noun_form(Gender::Masc, Number::Sg, Case::Gen),
-            Source::Lexicon,
+            Source::Attested,
         )
         .unwrap();
         b.add(
@@ -938,7 +939,7 @@ mod tests {
             "Tag",
             UPOS::NOUN,
             Features::noun_form(Gender::Masc, Number::Sg, Case::Nom),
-            Source::Lexicon,
+            Source::Attested,
         )
         .unwrap();
         let mut fst = Vec::new();
@@ -995,7 +996,7 @@ mod tests {
                 l,
                 UPOS::NOUN,
                 Features::noun_form(g, n, c),
-                Source::Lexicon,
+                Source::Attested,
             )
             .unwrap();
         }
@@ -1042,7 +1043,7 @@ mod tests {
             "Bund",
             UPOS::NOUN,
             Features::noun_form(Gender::Masc, Number::Sg, Case::Nom),
-            Source::Lexicon,
+            Source::Attested,
         )
         .unwrap();
         b.add(
@@ -1050,7 +1051,7 @@ mod tests {
             "Bund",
             UPOS::NOUN,
             Features::noun_form(Gender::Masc, Number::Sg, Case::Gen),
-            Source::Lexicon,
+            Source::Attested,
         )
         .unwrap();
         b.add(
@@ -1058,7 +1059,7 @@ mod tests {
             "Tag",
             UPOS::NOUN,
             Features::noun_form(Gender::Masc, Number::Sg, Case::Nom),
-            Source::Lexicon,
+            Source::Attested,
         )
         .unwrap();
         let mut fst = Vec::new();
@@ -1090,7 +1091,7 @@ mod tests {
             "Wort",
             UPOS::NOUN,
             Features::noun_form(Gender::Neut, Number::Sg, Case::Nom),
-            Source::Lexicon,
+            Source::Attested,
         )
         .unwrap();
         b.add(
@@ -1098,7 +1099,7 @@ mod tests {
             "Wort",
             UPOS::NOUN,
             Features::noun_form(Gender::Neut, Number::Pl, Case::Nom),
-            Source::Lexicon,
+            Source::Attested,
         )
         .unwrap();
         b.add(
@@ -1106,7 +1107,7 @@ mod tests {
             "Buch",
             UPOS::NOUN,
             Features::noun_form(Gender::Neut, Number::Sg, Case::Nom),
-            Source::Lexicon,
+            Source::Attested,
         )
         .unwrap();
         let mut fst = Vec::new();
@@ -1132,7 +1133,7 @@ mod tests {
                 surface,
                 UPOS::NOUN,
                 Features::noun_form(Gender::Masc, Number::Sg, Case::Nom),
-                Source::Lexicon,
+                Source::Attested,
             )
             .unwrap();
         }
@@ -1158,7 +1159,7 @@ mod tests {
             "Tisch",
             UPOS::NOUN,
             Features::noun_form(Gender::Masc, Number::Sg, Case::Nom),
-            Source::Lexicon,
+            Source::Attested,
         )
         .unwrap();
         let mut fst = Vec::new();
@@ -1178,7 +1179,7 @@ mod tests {
             "Buch",
             UPOS::NOUN,
             Features::noun_form(Gender::Neut, Number::Pl, Case::Nom),
-            Source::Lexicon,
+            Source::Attested,
         )
         .unwrap();
         b.add(
@@ -1186,7 +1187,7 @@ mod tests {
             "Buch",
             UPOS::NOUN,
             Features::noun_form(Gender::Neut, Number::Pl, Case::Dat),
-            Source::Lexicon,
+            Source::Attested,
         )
         .unwrap();
         let mut fst = Vec::new();

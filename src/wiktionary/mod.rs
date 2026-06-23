@@ -35,9 +35,9 @@ use crate::analysis::{Features, Source, UPOS};
 /// to the source Wiktionary article. Shared between the noun and verb
 /// extractors (and future adjective / pronoun extractors).
 ///
-/// `source` distinguishes lexicon-attested forms (`Source::Lexicon`)
+/// `source` distinguishes lexicon-attested forms (`Source::Attested`)
 /// from forms produced by paradigm rules during build-time expansion
-/// (`Source::Generated`). The two categories share the JSONL output
+/// (`Source::Inflected`). The two categories share the JSONL output
 /// shape so downstream tooling can tell them apart by tag rather than
 /// by file.
 ///

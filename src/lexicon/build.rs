@@ -404,7 +404,7 @@ mod tests {
             "Tisch",
             UPOS::NOUN,
             Features::noun_form(Gender::Masc, Number::Sg, Case::Nom),
-            Source::Lexicon,
+            Source::Attested,
         )
         .unwrap();
         b.add(
@@ -412,7 +412,7 @@ mod tests {
             "Tisch",
             UPOS::NOUN,
             Features::noun_form(Gender::Masc, Number::Sg, Case::Dat),
-            Source::Lexicon,
+            Source::Attested,
         )
         .unwrap();
         b.add(
@@ -420,7 +420,7 @@ mod tests {
             "Tisch",
             UPOS::NOUN,
             Features::noun_form(Gender::Masc, Number::Pl, Case::Nom),
-            Source::Lexicon,
+            Source::Attested,
         )
         .unwrap();
         b.add(
@@ -428,7 +428,7 @@ mod tests {
             "Tisch",
             UPOS::NOUN,
             Features::noun_form(Gender::Masc, Number::Pl, Case::Dat),
-            Source::Lexicon,
+            Source::Attested,
         )
         .unwrap();
 

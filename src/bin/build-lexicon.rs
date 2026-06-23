@@ -208,7 +208,7 @@ fn ingest_file(
             }
         };
         let features = build_features(&rec, counters);
-        let source = parse_source(rec.source.as_deref()).unwrap_or(Source::Lexicon);
+        let source = parse_source(rec.source.as_deref()).unwrap_or(Source::Attested);
 
         *counters.by_pos.entry(pos_label(pos)).or_insert(0) += 1;
         *counters.by_source.entry(source_label(source)).or_insert(0) += 1;
@@ -338,9 +338,12 @@ fn parse_pos(s: &str) -> Option<UPOS> {
 
 fn parse_source(s: Option<&str>) -> Option<Source> {
     Some(match s? {
-        "Lexicon" => Source::Lexicon,
-        "Generated" => Source::Generated,
-        "Guessed" => Source::Guessed,
+        // Legacy spellings (Lexicon/Generated/Guessed) are still accepted so
+        // pre-existing extracted JSONL keeps building.
+        "Attested" | "Lexicon" => Source::Attested,
+        "Inflected" | "Generated" => Source::Inflected,
+        "Composed" => Source::Composed,
+        "Predicted" | "Guessed" => Source::Predicted,
         _ => return None,
     })
 }
@@ -364,9 +367,10 @@ fn pos_label(p: UPOS) -> &'static str {
 
 fn source_label(s: Source) -> &'static str {
     match s {
-        Source::Lexicon => "Lexicon",
-        Source::Generated => "Generated",
-        Source::Guessed => "Guessed",
+        Source::Attested => "Attested",
+        Source::Inflected => "Inflected",
+        Source::Composed => "Composed",
+        Source::Predicted => "Predicted",
     }
 }
 

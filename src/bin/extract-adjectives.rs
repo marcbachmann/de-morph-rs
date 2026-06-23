@@ -106,9 +106,10 @@ fn declension_str(d: Declension) -> &'static str {
 
 fn source_str(s: Source) -> &'static str {
     match s {
-        Source::Lexicon => "Lexicon",
-        Source::Generated => "Generated",
-        Source::Guessed => "Guessed",
+        Source::Attested => "Attested",
+        Source::Inflected => "Inflected",
+        Source::Composed => "Composed",
+        Source::Predicted => "Predicted",
     }
 }
 

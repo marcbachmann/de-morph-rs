@@ -90,8 +90,8 @@ pub type ParadigmCell = (String, Analysis);
 /// unless the class itself implies one (WeakMasc derives its plural
 /// from the oblique stem; PluraleTantum reuses the lemma).
 ///
-/// All returned analyses are tagged [`Source::Generated`]; callers can
-/// promote them to `Source::Lexicon` after attestation.
+/// All returned analyses are tagged [`Source::Inflected`]; callers can
+/// promote them to `Source::Attested` after attestation.
 pub fn generate_noun_paradigm(
     lemma: &str,
     gender: Gender,
@@ -230,7 +230,7 @@ pub fn dative_plural(plural: &str) -> String {
 
 #[inline]
 fn push(out: &mut Vec<ParadigmCell>, surface: &str, lemma: &str, features: Features) {
-    let analysis = Analysis::with_source(lemma, UPOS::NOUN, features, Source::Generated);
+    let analysis = Analysis::with_source(lemma, UPOS::NOUN, features, Source::Inflected);
     out.push((surface.to_string(), analysis));
 }
 
@@ -647,7 +647,7 @@ mod tests {
         assert_eq!(surfaces(&p, Case::Acc, Number::Pl), vec!["Tische"]);
         assert_eq!(surfaces(&p, Case::Dat, Number::Pl), vec!["Tischen"]);
         // Source tag and lemma carried through.
-        assert!(p.iter().all(|(_, a)| a.source == Source::Generated));
+        assert!(p.iter().all(|(_, a)| a.source == Source::Inflected));
         assert!(p.iter().all(|(_, a)| a.pos == UPOS::NOUN));
         assert!(p.iter().all(|(_, a)| a.lemma == "Tisch"));
         assert!(p
@@ -815,7 +815,7 @@ mod tests {
     #[test]
     fn predict_dative_tagged_as_generated() {
         // The dative cells emitted via the paradigm generator should
-        // carry Source::Generated downstream (verified separately via
+        // carry Source::Inflected downstream (verified separately via
         // generate_noun_paradigm — the predict_* helper drops the
         // analysis and only returns surfaces).
         let p =
@@ -826,6 +826,6 @@ mod tests {
                 a.features.case == Some(Case::Dat) && a.features.number == Some(Number::Sg)
             })
             .unwrap();
-        assert_eq!(dat_sg.1.source, Source::Generated);
+        assert_eq!(dat_sg.1.source, Source::Inflected);
     }
 }

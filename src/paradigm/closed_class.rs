@@ -8,7 +8,7 @@
 //! 3. Hand-curation guarantees correctness, including the tricky
 //!    syncretisms ("sie" = 3Sg Fem Nom AND 3Pl Nom AND ...).
 //!
-//! All entries are tagged [`Source::Lexicon`] because they're directly
+//! All entries are tagged [`Source::Attested`] because they're directly
 //! curated by the maintainer from the standard German grammar.
 //!
 //! References (background, no specific section consulted while writing):
@@ -223,7 +223,7 @@ fn add_personal_pronouns(out: &mut Vec<ClosedClassEntry>) {
         };
         out.push((
             surface.to_string(),
-            Analysis::with_source(lemma, UPOS::PRON, features, Source::Lexicon),
+            Analysis::with_source(lemma, UPOS::PRON, features, Source::Attested),
         ));
     }
 }
@@ -265,7 +265,7 @@ fn add_definite_article(out: &mut Vec<ClosedClassEntry>) {
         };
         out.push((
             surface.to_string(),
-            Analysis::with_source("der", UPOS::DET, features, Source::Lexicon),
+            Analysis::with_source("der", UPOS::DET, features, Source::Attested),
         ));
     }
 }
@@ -321,7 +321,7 @@ fn add_ein_pattern(
         };
         out.push((
             surface,
-            Analysis::with_source(lemma, UPOS::DET, features, Source::Lexicon),
+            Analysis::with_source(lemma, UPOS::DET, features, Source::Attested),
         ));
     }
     if has_plural {
@@ -337,7 +337,7 @@ fn add_ein_pattern(
             };
             out.push((
                 surface,
-                Analysis::with_source(lemma, UPOS::DET, features, Source::Lexicon),
+                Analysis::with_source(lemma, UPOS::DET, features, Source::Attested),
             ));
         }
     }
@@ -372,7 +372,7 @@ fn add_vowel_reduced_pattern(
         };
         out.push((
             surface,
-            Analysis::with_source(lemma, UPOS::DET, features, Source::Lexicon),
+            Analysis::with_source(lemma, UPOS::DET, features, Source::Attested),
         ));
     }
     for &(case, suffix) in EIN_PATTERN_PL {
@@ -390,7 +390,7 @@ fn add_vowel_reduced_pattern(
         };
         out.push((
             surface,
-            Analysis::with_source(lemma, UPOS::DET, features, Source::Lexicon),
+            Analysis::with_source(lemma, UPOS::DET, features, Source::Attested),
         ));
     }
 }
@@ -431,7 +431,7 @@ fn add_reflexive_pronouns(out: &mut Vec<ClosedClassEntry>) {
         };
         out.push((
             surface.to_string(),
-            Analysis::with_source("sich", UPOS::PRON, features, Source::Lexicon),
+            Analysis::with_source("sich", UPOS::PRON, features, Source::Attested),
         ));
     }
 }
@@ -464,7 +464,7 @@ fn add_relative_pronouns(out: &mut Vec<ClosedClassEntry>) {
         };
         out.push((
             surface.to_string(),
-            Analysis::with_source("der", UPOS::PRON, features, Source::Lexicon),
+            Analysis::with_source("der", UPOS::PRON, features, Source::Attested),
         ));
     }
     // Relative-specific Genitive forms.
@@ -484,7 +484,7 @@ fn add_relative_pronouns(out: &mut Vec<ClosedClassEntry>) {
         };
         out.push((
             surface.to_string(),
-            Analysis::with_source("der", UPOS::PRON, features, Source::Lexicon),
+            Analysis::with_source("der", UPOS::PRON, features, Source::Attested),
         ));
     }
 }
@@ -523,7 +523,7 @@ fn add_interrogative_pronouns(out: &mut Vec<ClosedClassEntry>) {
         };
         out.push((
             surface.to_string(),
-            Analysis::with_source(lemma, UPOS::PRON, features, Source::Lexicon),
+            Analysis::with_source(lemma, UPOS::PRON, features, Source::Attested),
         ));
     }
 }
@@ -552,7 +552,7 @@ fn add_indefinite_pronouns(out: &mut Vec<ClosedClassEntry>) {
             };
             out.push((
                 surface,
-                Analysis::with_source(lemma, UPOS::PRON, features, Source::Lexicon),
+                Analysis::with_source(lemma, UPOS::PRON, features, Source::Attested),
             ));
         }
         // Bare-stem Acc (colloquial): "jemand" without -en ending.
@@ -566,7 +566,7 @@ fn add_indefinite_pronouns(out: &mut Vec<ClosedClassEntry>) {
                     case: Some(Case::Acc),
                     ..Features::empty()
                 },
-                Source::Lexicon,
+                Source::Attested,
             ),
         ));
     }
@@ -585,7 +585,7 @@ fn add_indefinite_pronouns(out: &mut Vec<ClosedClassEntry>) {
                 case: Some(Case::Nom),
                 ..Features::empty()
             },
-            Source::Lexicon,
+            Source::Attested,
         ),
     ));
 
@@ -593,7 +593,7 @@ fn add_indefinite_pronouns(out: &mut Vec<ClosedClassEntry>) {
     for &lemma in &["etwas", "nichts"] {
         out.push((
             lemma.to_string(),
-            Analysis::with_source(lemma, UPOS::PRON, Features::empty(), Source::Lexicon),
+            Analysis::with_source(lemma, UPOS::PRON, Features::empty(), Source::Attested),
         ));
     }
 
@@ -618,7 +618,7 @@ fn add_indefinite_pronouns(out: &mut Vec<ClosedClassEntry>) {
                     case: Some(case),
                     ..Features::empty()
                 },
-                Source::Lexicon,
+                Source::Attested,
             ),
         ));
     }
@@ -644,7 +644,7 @@ fn add_indefinite_pronouns(out: &mut Vec<ClosedClassEntry>) {
                         case: Some(case),
                         ..Features::empty()
                     },
-                    Source::Lexicon,
+                    Source::Attested,
                 ),
             ));
         }
@@ -695,7 +695,7 @@ fn add_numerals(out: &mut Vec<ClosedClassEntry>) {
     for &numeral in CARDINAL_NUMERALS {
         out.push((
             numeral.to_string(),
-            Analysis::with_source(numeral, UPOS::NUM, Features::empty(), Source::Lexicon),
+            Analysis::with_source(numeral, UPOS::NUM, Features::empty(), Source::Attested),
         ));
     }
     // "ein" as numeral (alongside the article); declensions already
@@ -703,7 +703,7 @@ fn add_numerals(out: &mut Vec<ClosedClassEntry>) {
     // "ein" needs an explicit Num entry too.
     out.push((
         "ein".to_string(),
-        Analysis::with_source("ein", UPOS::NUM, Features::empty(), Source::Lexicon),
+        Analysis::with_source("ein", UPOS::NUM, Features::empty(), Source::Attested),
     ));
 }
 
@@ -761,7 +761,7 @@ fn add_ordinals(out: &mut Vec<ClosedClassEntry>) {
             // cells, etc.). Also retag as Lexicon since the ordinal
             // table itself is hand-curated by us.
             analysis.pos = UPOS::NUM;
-            analysis.source = Source::Lexicon;
+            analysis.source = Source::Attested;
             out.push((surface, analysis));
         }
     }
@@ -791,7 +791,7 @@ fn add_compound_cardinals(out: &mut Vec<ClosedClassEntry>) {
             let surface = format!("{one}und{ten}");
             out.push((
                 surface.clone(),
-                Analysis::with_source(&surface, UPOS::NUM, Features::empty(), Source::Lexicon),
+                Analysis::with_source(&surface, UPOS::NUM, Features::empty(), Source::Attested),
             ));
         }
     }
@@ -803,7 +803,7 @@ fn add_compound_cardinals(out: &mut Vec<ClosedClassEntry>) {
         let surface = format!("{one}hundert");
         out.push((
             surface.clone(),
-            Analysis::with_source(&surface, UPOS::NUM, Features::empty(), Source::Lexicon),
+            Analysis::with_source(&surface, UPOS::NUM, Features::empty(), Source::Attested),
         ));
     }
     // 2000-9000: <ones>tausend.
@@ -814,7 +814,7 @@ fn add_compound_cardinals(out: &mut Vec<ClosedClassEntry>) {
         let surface = format!("{one}tausend");
         out.push((
             surface.clone(),
-            Analysis::with_source(&surface, UPOS::NUM, Features::empty(), Source::Lexicon),
+            Analysis::with_source(&surface, UPOS::NUM, Features::empty(), Source::Attested),
         ));
     }
 }
@@ -876,13 +876,13 @@ fn add_conjunctions(out: &mut Vec<ClosedClassEntry>) {
     for &c in COORDINATING_CONJUNCTIONS {
         out.push((
             c.to_string(),
-            Analysis::with_source(c, UPOS::CCONJ, Features::empty(), Source::Lexicon),
+            Analysis::with_source(c, UPOS::CCONJ, Features::empty(), Source::Attested),
         ));
     }
     for &c in SUBORDINATING_CONJUNCTIONS {
         out.push((
             c.to_string(),
-            Analysis::with_source(c, UPOS::SCONJ, Features::empty(), Source::Lexicon),
+            Analysis::with_source(c, UPOS::SCONJ, Features::empty(), Source::Attested),
         ));
     }
 }
@@ -971,7 +971,7 @@ fn add_prepositions(out: &mut Vec<ClosedClassEntry>) {
     for &p in PREPOSITIONS {
         out.push((
             p.to_string(),
-            Analysis::with_source(p, UPOS::ADP, Features::empty(), Source::Lexicon),
+            Analysis::with_source(p, UPOS::ADP, Features::empty(), Source::Attested),
         ));
     }
 }
@@ -1009,7 +1009,7 @@ fn add_punctuation(out: &mut Vec<ClosedClassEntry>) {
     for &p in PUNCTUATION {
         out.push((
             p.to_string(),
-            Analysis::with_source(p, UPOS::PUNCT, Features::empty(), Source::Lexicon),
+            Analysis::with_source(p, UPOS::PUNCT, Features::empty(), Source::Attested),
         ));
     }
 }
@@ -1063,7 +1063,7 @@ fn add_demonstrative_pattern(out: &mut Vec<ClosedClassEntry>, lemma: &str) {
         };
         out.push((
             surface,
-            Analysis::with_source(lemma, UPOS::DET, features, Source::Lexicon),
+            Analysis::with_source(lemma, UPOS::DET, features, Source::Attested),
         ));
     }
     for &(case, suffix) in DEMONSTRATIVE_PATTERN_PL {
@@ -1075,7 +1075,7 @@ fn add_demonstrative_pattern(out: &mut Vec<ClosedClassEntry>, lemma: &str) {
         };
         out.push((
             surface,
-            Analysis::with_source(lemma, UPOS::DET, features, Source::Lexicon),
+            Analysis::with_source(lemma, UPOS::DET, features, Source::Attested),
         ));
     }
 }
@@ -1257,7 +1257,7 @@ mod tests {
     fn all_entries_tagged_lexicon() {
         let entries = generate_closed_class_entries();
         for (_, a) in &entries {
-            assert_eq!(a.source, Source::Lexicon);
+            assert_eq!(a.source, Source::Attested);
         }
     }
 

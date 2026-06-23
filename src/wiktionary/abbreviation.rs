@@ -309,7 +309,7 @@ pub fn extract_abbreviations(title: &str, page_text: &str) -> Vec<ExtractedEntry
         lemma: title.to_string(),
         pos,
         features: Features::empty(),
-        source: Source::Lexicon,
+        source: Source::Attested,
         source_title: title.to_string(),
     }]
 }

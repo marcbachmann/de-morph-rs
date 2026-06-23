@@ -148,8 +148,8 @@ mod tests {
             assert_eq!(e.features.aux, Some(Aux::Haben));
         }
 
-        // Spot-check that attested forms are tagged Lexicon and derived
-        // forms tagged Generated.
+        // Spot-check that attested forms are tagged Attested and derived
+        // forms tagged Inflected.
         let attested_1sg = entries
             .iter()
             .find(|e| {
@@ -161,7 +161,7 @@ mod tests {
             })
             .unwrap();
         assert_eq!(attested_1sg.surface, "liebe");
-        assert_eq!(attested_1sg.source, Source::Lexicon);
+        assert_eq!(attested_1sg.source, Source::Attested);
 
         let derived_2pl = entries
             .iter()
@@ -174,7 +174,7 @@ mod tests {
             })
             .unwrap();
         assert_eq!(derived_2pl.surface, "liebt");
-        assert_eq!(derived_2pl.source, Source::Generated);
+        assert_eq!(derived_2pl.source, Source::Inflected);
     }
 
     #[test]

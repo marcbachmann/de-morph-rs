@@ -155,7 +155,7 @@ fn push_if_present(
         lemma: lemma.to_string(),
         pos: UPOS::NOUN,
         features: Features::noun_form(gender, number, case),
-        source: Source::Lexicon,
+        source: Source::Attested,
         source_title: title.to_string(),
     });
 }

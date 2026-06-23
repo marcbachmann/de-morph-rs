@@ -4,11 +4,11 @@
 //! - **Generate**: given a known lemma, gender, declension class and (where
 //!   relevant) a plural form, produce the full paradigm. This is the
 //!   "I know everything about this lemma except the inflected forms"
-//!   case. Forms are tagged [`crate::analysis::Source::Generated`].
+//!   case. Forms are tagged [`crate::analysis::Source::Inflected`].
 //! - **Guess**: given an out-of-vocabulary surface form, heuristically
 //!   propose lemma + declension hypotheses ranked by confidence. Forms
 //!   produced from these guesses are tagged
-//!   [`crate::analysis::Source::Guessed`].
+//!   [`crate::analysis::Source::Predicted`].
 //!
 //! The two layers compose: the runtime analyzer first tries the FST
 //! lexicon; if that misses, it falls back to the guesser; the `Source`

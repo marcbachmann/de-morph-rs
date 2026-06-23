@@ -4,9 +4,9 @@
 //! Superlativ) and produces the full inflected paradigm:
 //!
 //! - **Predicative / uninflected**: the bare form for each degree (e.g.
-//!   "groß", "größer", "am größten"). Tagged `Source::Lexicon`.
+//!   "groß", "größer", "am größten"). Tagged `Source::Attested`.
 //! - **Attributive**: full case × number × gender × declension matrix
-//!   for each degree. Tagged `Source::Generated`.
+//!   for each degree. Tagged `Source::Inflected`.
 //!
 //! For an adjective with all three degrees the paradigm contains
 //! roughly 3 predicative + 72 × 3 = 219 attributive cells; that's a
@@ -58,12 +58,12 @@ pub fn generate_adjective_paradigm(inputs: &AdjectiveAttested) -> Vec<AdjectiveC
     let lemma = inputs.lemma;
 
     // Predicative / uninflected forms.
-    push_predicative(&mut out, lemma, lemma, Degree::Pos, Source::Lexicon);
+    push_predicative(&mut out, lemma, lemma, Degree::Pos, Source::Attested);
     if let Some(c) = inputs.komparativ {
-        push_predicative(&mut out, c, lemma, Degree::Cmp, Source::Lexicon);
+        push_predicative(&mut out, c, lemma, Degree::Cmp, Source::Attested);
     }
     if let Some(s) = inputs.superlativ {
-        push_predicative(&mut out, s, lemma, Degree::Sup, Source::Lexicon);
+        push_predicative(&mut out, s, lemma, Degree::Sup, Source::Attested);
     }
 
     // Attributive forms — apply 72 endings to each degree's resolved
@@ -139,7 +139,7 @@ fn apply_all_endings(out: &mut Vec<AdjectiveCell>, stem: &str, lemma: &str, degr
                             gender: Some(gender),
                             ..Features::empty()
                         },
-                        Source::Generated,
+                        Source::Inflected,
                     );
                     out.push((surface, analysis));
                 }
@@ -568,7 +568,7 @@ mod tests {
             .iter()
             .find(|(s, _)| s == "groß")
             .expect("missing predicative groß");
-        assert_eq!(pred.1.source, Source::Lexicon);
+        assert_eq!(pred.1.source, Source::Attested);
     }
 
     #[test]
@@ -944,6 +944,6 @@ mod tests {
             })
             .expect("missing strong Sg Nom Masc");
         assert_eq!(attr.0, "großer");
-        assert_eq!(attr.1.source, Source::Generated);
+        assert_eq!(attr.1.source, Source::Inflected);
     }
 }

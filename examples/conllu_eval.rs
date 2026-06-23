@@ -24,7 +24,7 @@ const DAT_PATH: &str = "data/lexicon/lexicon.dat";
 #[derive(Default, Debug, Clone, Copy)]
 struct Counts {
     total: u64,
-    in_lex: u64,           // analyzer returned at least one (non-Guessed) analysis
+    in_lex: u64,           // analyzer returned at least one (non-Predicted) analysis
     any_hit: u64,          // analyzer returned at least one analysis (lex or guess)
     lemma_match: u64,      // any returned analysis has lemma == gold
     pos_match: u64,        // any returned analysis has pos == gold
@@ -225,7 +225,12 @@ fn process_file(
 
         let any_hit = !analyses.is_empty();
         let in_lex = analyses.iter().any(|a| {
-            a.source == de_morph::Source::Lexicon || a.source == de_morph::Source::Generated
+            // Lexicon-backed = anything but a pure OOV guess. Compounds built
+            // from in-lexicon parts (Composed) count, matching the behaviour
+            // before Source gained a distinct compound tier.
+            a.source == de_morph::Source::Attested
+                || a.source == de_morph::Source::Inflected
+                || a.source == de_morph::Source::Composed
         });
         let lemma_match = analyses.iter().any(|a| a.lemma == gold_lemma);
         let pos_match = gold_pos

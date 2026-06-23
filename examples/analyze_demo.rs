@@ -25,7 +25,7 @@
 use std::io::{self, BufRead, IsTerminal};
 use std::time::Instant;
 
-use de_morph::Analyzer;
+use de_morph::{Analysis, Analyzer, Source};
 
 const SAMPLES: &[&str] = &[
     // Noun forms
@@ -47,7 +47,7 @@ const SAMPLES: &[&str] = &[
     "großen", // expected: many cells (Dat Pl, Acc Sg Masc, Sg Gen/Dat M+N, ...)
     "größte", // expected: Sup attributive
     // OOV — these are unlikely to be in Wiktionary
-    "Quitschung",   // expected: Guessed (-ung → Fem Strong)
+    "Quitschung",   // expected: Predicted (-ung → Fem Strong)
     "Quitschungen", // OOV Dat Pl recovery via suffix-strip
     "Quitschen",    // OOV Dat Pl recovery: lemma=Quitsch, Strong Masc
     "Schmurkes",    // OOV Gen Sg recovery: lemma=Schmurk, Strong Masc
@@ -71,19 +71,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // sentence (the rest of argv joined with spaces) or a literal `-`
     // to force stdin reads.
     let mut swiss = false;
+    let mut oov = true;
     let mut force_stdin = false;
     let mut positional: Vec<String> = Vec::new();
     for arg in std::env::args().skip(1) {
         match arg.as_str() {
             "--swiss" => swiss = true,
+            "--no-oov" => oov = false,
             "-" => force_stdin = true,
             "--help" | "-h" => {
-                eprintln!("usage: analyze_demo [--swiss] [SENTENCE | -]");
+                eprintln!("usage: analyze_demo [--swiss] [--no-oov] [SENTENCE | -]");
                 eprintln!("  (none)        → curated showcase");
                 eprintln!("  SENTENCE      → tokenise on whitespace, analyse each word");
                 eprintln!("  -             → force read from stdin (one sentence per line)");
                 eprintln!("  pipe to stdin → same as `-`, auto-detected when stdin is not a TTY");
                 eprintln!("  --swiss       → enable ss→ß orthography bridge");
+                eprintln!("  --no-oov      → disable out-of-vocabulary guessing (drops Predicted results)");
                 std::process::exit(0);
             }
             _ => positional.push(arg),
@@ -103,6 +106,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut analyzer = Analyzer::open("data/lexicon/lexicon.fst", "data/lexicon/lexicon.dat")?;
     if swiss {
         analyzer = analyzer.with_swiss_orthography(true);
+    }
+    if !oov {
+        analyzer = analyzer.with_oov_fallback(false);
     }
     eprintln!("  loaded in {:.2}s\n", load_start.elapsed().as_secs_f64());
 
@@ -160,7 +166,7 @@ fn print_one(analyzer: &Analyzer, surface: &str) {
     }
     for a in &analyses {
         println!(
-            "  {:<10} {:?}{}{}{}{}{}{}{}{}  source={:?}",
+            "  {:<10} {:?}{}{}{}{}{}{}{}{}  · {} [{}]",
             a.lemma,
             a.pos,
             opt(a.features.gender),
@@ -171,10 +177,34 @@ fn print_one(analyzer: &Analyzer, surface: &str) {
             opt(a.features.mood),
             opt(a.features.form),
             opt(a.features.aux),
-            a.source,
+            provenance(a),
+            confidence(a.source),
         );
     }
     println!("  ({} result(s) in {} µs)\n", analyses.len(), elapsed_us);
+}
+
+/// Human-readable provenance for one analysis, naming the lemma it came
+/// from. This is NOT a probability — the analyzer carries no corpus
+/// frequencies — but a trust tier derived from how the form was obtained.
+fn provenance(a: &Analysis) -> String {
+    match a.source {
+        Source::Attested => "attested in lexicon".to_string(),
+        Source::Inflected => format!("inflected from lemma «{}»", a.lemma),
+        Source::Composed => "composed from in-lexicon parts".to_string(),
+        Source::Predicted => "predicted — lemma not in lexicon".to_string(),
+    }
+}
+
+/// Confidence tier derived from the source. Ordered Attested > Inflected
+/// > Composed > Predicted.
+fn confidence(s: Source) -> &'static str {
+    match s {
+        Source::Attested => "confidence: high",
+        Source::Inflected => "confidence: medium",
+        Source::Composed => "confidence: medium-low",
+        Source::Predicted => "confidence: low",
+    }
 }
 
 fn opt<T: std::fmt::Debug>(v: Option<T>) -> String {

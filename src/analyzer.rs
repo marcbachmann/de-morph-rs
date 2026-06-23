@@ -86,7 +86,7 @@ impl Analyzer {
     /// Behaviour:
     /// 1. If a lexicon is loaded, look up `surface` there. If the
     ///    lookup returns any analyses, those are returned (tagged
-    ///    `Source::Lexicon` or `Source::Generated` as the build
+    ///    `Source::Attested` or `Source::Inflected` as the build
     ///    pipeline recorded them).
     /// 2. **Swiss-orthography fallback** (opt-in via
     ///    [`with_swiss_orthography`]): when the flag is on, probe
@@ -98,7 +98,7 @@ impl Analyzer {
     ///    match Swiss surfaces directly.
     /// 3. Otherwise, if OOV fallback is enabled, the suffix-based
     ///    noun guesser produces best-effort analyses tagged
-    ///    `Source::Guessed`.
+    ///    `Source::Predicted`.
     ///
     /// Returns an empty vector when neither path produces anything.
     pub fn analyze(&self, surface: &str) -> Vec<Analysis> {
@@ -217,9 +217,9 @@ impl Analyzer {
     ///    wins. We synthesise one output analysis per right hit, with
     ///    `lemma = "{left}-{right_lemma}"` and the right's POS and
     ///    features. The synthesised compound is tagged
-    ///    `Source::Generated`: the whole compound was never attested as
-    ///    a unit (so not `Lexicon`), but it is rule-derived from known
-    ///    lemmas (so not `Guessed`, which means the lemma is unknown).
+    ///    `Source::Composed`: the whole compound was never attested as a
+    ///    unit (so not `Attested`), but every part is in the lexicon, so it
+    ///    ranks above out-of-vocabulary `Predicted` guesses.
     ///
     /// Relationship to the SOLID-compound splitter
     /// [`Lexicon::split_compound_detailed`]: that splitter handles
@@ -269,7 +269,7 @@ impl Analyzer {
             // multi-hyphen chains work. We deliberately do NOT call
             // back into self.analyze() — that would invoke the OOV
             // path, and we don't want to build compound analyses on
-            // top of guessed bases (would chain `Guessed` sources and
+            // top of guessed bases (would chain `Predicted` sources and
             // emit low-confidence speculation).
             let right_hits = {
                 let direct = lex.analyze(right);
@@ -282,9 +282,9 @@ impl Analyzer {
             };
             // Synthesise one compound analysis per DISTINCT right hit.
             // Dedup by (lemma, pos, packed features): every synthesised
-            // analysis is forced to Source::Generated, so two right hits
-            // that differ only in their source (e.g. one Lexicon, one
-            // Generated for the same form) would otherwise collapse to
+            // analysis is forced to Source::Composed, so two right hits
+            // that differ only in their source (e.g. one Attested, one
+            // Inflected for the same form) would otherwise collapse to
             // byte-identical compounds. Distinct features are preserved.
             let mut synthesised: Vec<Analysis> = Vec::new();
             let mut seen: HashSet<(String, u8, u32)> = HashSet::new();
@@ -305,10 +305,13 @@ impl Analyzer {
                     lemma,
                     pos: a.pos,
                     features: a.features,
-                    // Synthesised, not attested as a whole: tag Generated
-                    // rather than inheriting the right part's source (which
-                    // would mislabel the compound as Lexicon-attested).
-                    source: Source::Generated,
+                    // Built from parts that are all in the lexicon (left is an
+                    // attested nominal lemma, right resolved by lexicon lookup
+                    // — never the OOV path), but never attested as a whole
+                    // word: tag Composed rather than inheriting the right
+                    // part's source (which would mislabel it Attested) or
+                    // Predicted (which is for unknown lemmas).
+                    source: Source::Composed,
                 });
             }
             if !synthesised.is_empty() {
@@ -429,7 +432,7 @@ impl Analyzer {
 
     /// Apply the suffix-based noun guesser to `surface` and return any
     /// paradigm cells whose generated form matches `surface`. The
-    /// returned analyses are tagged `Source::Guessed`.
+    /// returned analyses are tagged `Source::Predicted`.
     ///
     /// Two pathways are tried:
     ///   1. **Surface = lemma.** The user looked up an uninflected
@@ -509,7 +512,7 @@ fn try_lemma_hypothesis(
                 PackedFeatures::pack(analysis.features).0,
             );
             if seen.insert(key) {
-                analysis.source = Source::Guessed;
+                analysis.source = Source::Predicted;
                 out.push(analysis);
             }
         }
@@ -548,7 +551,7 @@ fn try_adj_lemma_hypothesis(
             PackedFeatures::pack(analysis.features).0,
         );
         if seen.insert(key) {
-            analysis.source = Source::Guessed;
+            analysis.source = Source::Predicted;
             out.push(analysis);
         }
     }
@@ -709,7 +712,7 @@ fn try_verb_lemma_hypothesis(
             PackedFeatures::pack(analysis.features).0,
         );
         if seen.insert(key) {
-            analysis.source = Source::Guessed;
+            analysis.source = Source::Predicted;
             out.push(analysis);
         }
     }
@@ -741,7 +744,7 @@ mod tests {
             "Tisch",
             UPOS::NOUN,
             Features::noun_form(Gender::Masc, Number::Sg, Case::Nom),
-            Source::Lexicon,
+            Source::Attested,
         )
         .unwrap();
         let mut fst = Vec::new();
@@ -751,7 +754,7 @@ mod tests {
 
         let hits = analyzer.analyze("Tisch");
         assert_eq!(hits.len(), 1);
-        assert_eq!(hits[0].source, Source::Lexicon);
+        assert_eq!(hits[0].source, Source::Attested);
     }
 
     #[test]
@@ -761,7 +764,7 @@ mod tests {
         let hits = analyzer.analyze("Zeitung");
         // Suffix -ung → Fem Strong; Nom Sg cell matches the surface.
         assert!(!hits.is_empty(), "expected at least one guessed analysis");
-        assert!(hits.iter().any(|a| a.source == Source::Guessed));
+        assert!(hits.iter().any(|a| a.source == Source::Predicted));
         assert!(hits.iter().any(|a| a.features.gender == Some(Gender::Fem)));
     }
 
@@ -788,7 +791,7 @@ mod tests {
         assert!(dat_pl.is_some(), "expected a Dat Pl guess in {hits:#?}");
         let g = dat_pl.unwrap();
         assert_eq!(g.lemma, "Quitsch");
-        assert_eq!(g.source, Source::Guessed);
+        assert_eq!(g.source, Source::Predicted);
     }
 
     #[test]
@@ -838,7 +841,7 @@ mod tests {
             "expected verb 1Sg Past Ind in {hits:#?}"
         );
         assert_eq!(past_1sg.unwrap().lemma, "lieben");
-        assert_eq!(past_1sg.unwrap().source, Source::Guessed);
+        assert_eq!(past_1sg.unwrap().source, Source::Predicted);
     }
 
     #[test]
@@ -866,7 +869,7 @@ mod tests {
         let inf = hits.iter().find(|a| a.features.form == Some(VerbForm::Inf));
         assert!(inf.is_some(), "expected Inf in {hits:#?}");
         assert_eq!(inf.unwrap().lemma, "spielen");
-        assert_eq!(inf.unwrap().source, Source::Guessed);
+        assert_eq!(inf.unwrap().source, Source::Predicted);
     }
 
     #[test]
@@ -930,7 +933,7 @@ mod tests {
             "Palmöl",
             UPOS::NOUN,
             Features::noun_form(Gender::Neut, Number::Sg, Case::Nom),
-            Source::Lexicon,
+            Source::Attested,
         )
         .unwrap();
         b.add(
@@ -938,7 +941,7 @@ mod tests {
             "Import",
             UPOS::NOUN,
             Features::noun_form(Gender::Masc, Number::Pl, Case::Nom),
-            Source::Lexicon,
+            Source::Attested,
         )
         .unwrap();
         let mut fst = Vec::new();
@@ -951,9 +954,9 @@ mod tests {
         let h = hits.iter().find(|a| a.pos == UPOS::NOUN).unwrap();
         assert_eq!(h.lemma, "Palmöl-Import");
         assert_eq!(h.features.number, Some(Number::Pl));
-        // Synthesised compound is rule-derived from known parts, not
-        // attested as a whole → Generated (not the right part's Lexicon tag).
-        assert_eq!(h.source, Source::Generated);
+        // Synthesised compound from parts that are all in the lexicon, not
+        // attested as a whole → Composed (not the right part's Attested tag).
+        assert_eq!(h.source, Source::Composed);
     }
 
     #[test]
@@ -968,7 +971,7 @@ mod tests {
                 lem,
                 UPOS::NOUN,
                 Features::noun_form(Gender::Fem, Number::Sg, Case::Nom),
-                Source::Lexicon,
+                Source::Attested,
             )
             .unwrap();
         }
@@ -994,7 +997,7 @@ mod tests {
             "schwarz",
             UPOS::ADJ,
             Features::empty(),
-            Source::Lexicon,
+            Source::Attested,
         )
         .unwrap();
         b.add(
@@ -1002,7 +1005,7 @@ mod tests {
             "weiß",
             UPOS::ADJ,
             Features::empty(),
-            Source::Lexicon,
+            Source::Attested,
         )
         .unwrap();
         let mut fst = Vec::new();
@@ -1018,12 +1021,12 @@ mod tests {
         );
     }
 
-    /// Build an analyzer over `entries` (all tagged `Source::Lexicon`)
+    /// Build an analyzer over `entries` (all tagged `Source::Attested`)
     /// with the OOV fallback disabled, so tests isolate the hyphen path.
     fn lexicon_analyzer(entries: &[(&str, &str, UPOS, Features)]) -> Analyzer {
         let mut b = LexiconBuilder::new();
         for &(surface, lemma, pos, features) in entries {
-            b.add(surface, lemma, pos, features, Source::Lexicon)
+            b.add(surface, lemma, pos, features, Source::Attested)
                 .unwrap();
         }
         let mut fst = Vec::new();
@@ -1051,7 +1054,7 @@ mod tests {
             .find(|a| a.lemma == "Volkswagen-Konzern")
             .unwrap_or_else(|| panic!("expected PROPN-left compound, got {hits:?}"));
         assert_eq!(h.pos, UPOS::NOUN);
-        assert_eq!(h.source, Source::Generated);
+        assert_eq!(h.source, Source::Composed);
     }
 
     #[test]
@@ -1079,8 +1082,8 @@ mod tests {
     #[test]
     fn analyzer_hyphen_dedupes_identical_right_analyses() {
         // The right form "Teile" is attested twice with the SAME
-        // (lemma, pos, features) but different Source (Lexicon vs
-        // Generated). Because the compound forces Source::Generated,
+        // (lemma, pos, features) but different Source (Attested vs
+        // Inflected). Because the compound forces Source::Composed,
         // both would collapse to identical analyses — dedup keeps one.
         let mut b = LexiconBuilder::new();
         b.add(
@@ -1088,13 +1091,13 @@ mod tests {
             "Auto",
             UPOS::NOUN,
             Features::noun_form(Gender::Neut, Number::Sg, Case::Nom),
-            Source::Lexicon,
+            Source::Attested,
         )
         .unwrap();
         let pl = Features::noun_form(Gender::Masc, Number::Pl, Case::Nom);
-        b.add("Teile", "Teil", UPOS::NOUN, pl, Source::Lexicon)
+        b.add("Teile", "Teil", UPOS::NOUN, pl, Source::Attested)
             .unwrap();
-        b.add("Teile", "Teil", UPOS::NOUN, pl, Source::Generated)
+        b.add("Teile", "Teil", UPOS::NOUN, pl, Source::Inflected)
             .unwrap();
         let mut fst = Vec::new();
         let mut side = Vec::new();
@@ -1162,7 +1165,7 @@ mod tests {
             "heißen",
             UPOS::VERB,
             Features::empty(),
-            Source::Lexicon,
+            Source::Attested,
         )
         .unwrap();
         let mut fst = Vec::new();
@@ -1188,7 +1191,7 @@ mod tests {
             "heißen",
             UPOS::VERB,
             Features::empty(),
-            Source::Lexicon,
+            Source::Attested,
         )
         .unwrap();
         let mut fst = Vec::new();
@@ -1213,7 +1216,7 @@ mod tests {
             "Kasse",
             UPOS::NOUN,
             Features::noun_form(Gender::Fem, Number::Sg, Case::Nom),
-            Source::Lexicon,
+            Source::Attested,
         )
         .unwrap();
         let mut fst = Vec::new();

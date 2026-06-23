@@ -11,8 +11,8 @@
 //! - 2 Imp cells (Sg / Pl, 2nd person)
 //! - Inf, InfZu, PtcPres, PtcPerf
 //!
-//! Forms attested by Wiktionary keep `Source::Lexicon`; rule-derived
-//! cells are `Source::Generated`. When the rule's output happens to
+//! Forms attested by Wiktionary keep `Source::Attested`; rule-derived
+//! cells are `Source::Inflected`. When the rule's output happens to
 //! coincide with an attested form (a common case), both are emitted —
 //! that's OK because the downstream FST builder will collapse
 //! duplicates while keeping multiple analyses per surface.
@@ -24,7 +24,7 @@
 //! - True suppletives: the cells the rule layer gets wrong for `sein`
 //!   and `tun` (Pres Ind plural, Konj I, PtcPres) are replaced by a
 //!   curated closed-class table (`SUPPLETIVE_OVERRIDES`), tagged
-//!   `Source::Lexicon`. `haben`/`werden` need no override once their
+//!   `Source::Attested`. `haben`/`werden` need no override once their
 //!   attested Wiktionary fields are present.
 //!
 //! Out of scope:
@@ -83,21 +83,21 @@ pub fn generate_verb_paradigm(inputs: &VerbAttested) -> Vec<VerbCell> {
         &mut out,
         inf,
         inf,
-        Source::Generated,
+        Source::Inflected,
         features_form(VerbForm::Inf),
     );
     push(
         &mut out,
         &format!("zu {inf}"),
         inf,
-        Source::Generated,
+        Source::Inflected,
         features_form(VerbForm::InfZu),
     );
     push(
         &mut out,
         &format!("{inf}d"),
         inf,
-        Source::Generated,
+        Source::Inflected,
         features_form(VerbForm::PtcPres),
     );
     if let Some(p2) = inputs.partizip_perf {
@@ -105,7 +105,7 @@ pub fn generate_verb_paradigm(inputs: &VerbAttested) -> Vec<VerbCell> {
             &mut out,
             p2,
             inf,
-            Source::Lexicon,
+            Source::Attested,
             features_form(VerbForm::PtcPerf),
         );
     }
@@ -116,7 +116,7 @@ pub fn generate_verb_paradigm(inputs: &VerbAttested) -> Vec<VerbCell> {
             &mut out,
             s,
             inf,
-            Source::Lexicon,
+            Source::Attested,
             features_finite(Person::P1, Number::Sg, Tense::Pres, Mood::Ind),
         );
     }
@@ -125,7 +125,7 @@ pub fn generate_verb_paradigm(inputs: &VerbAttested) -> Vec<VerbCell> {
             &mut out,
             s,
             inf,
-            Source::Lexicon,
+            Source::Attested,
             features_finite(Person::P2, Number::Sg, Tense::Pres, Mood::Ind),
         );
     }
@@ -134,7 +134,7 @@ pub fn generate_verb_paradigm(inputs: &VerbAttested) -> Vec<VerbCell> {
             &mut out,
             s,
             inf,
-            Source::Lexicon,
+            Source::Attested,
             features_finite(Person::P3, Number::Sg, Tense::Pres, Mood::Ind),
         );
     }
@@ -143,21 +143,21 @@ pub fn generate_verb_paradigm(inputs: &VerbAttested) -> Vec<VerbCell> {
         &mut out,
         inf,
         inf,
-        Source::Generated,
+        Source::Inflected,
         features_finite(Person::P1, Number::Pl, Tense::Pres, Mood::Ind),
     );
     push(
         &mut out,
         &present_2pl(&stem),
         inf,
-        Source::Generated,
+        Source::Inflected,
         features_finite(Person::P2, Number::Pl, Tense::Pres, Mood::Ind),
     );
     push(
         &mut out,
         inf,
         inf,
-        Source::Generated,
+        Source::Inflected,
         features_finite(Person::P3, Number::Pl, Tense::Pres, Mood::Ind),
     );
 
@@ -165,9 +165,9 @@ pub fn generate_verb_paradigm(inputs: &VerbAttested) -> Vec<VerbCell> {
     if let Some(p1) = inputs.past_1sg {
         for (person, number, form, attested) in past_paradigm(p1) {
             let source = if attested {
-                Source::Lexicon
+                Source::Attested
             } else {
-                Source::Generated
+                Source::Inflected
             };
             push(
                 &mut out,
@@ -188,7 +188,7 @@ pub fn generate_verb_paradigm(inputs: &VerbAttested) -> Vec<VerbCell> {
             &mut out,
             &form,
             inf,
-            Source::Generated,
+            Source::Inflected,
             features_finite(person, number, Tense::Pres, Mood::Sub1),
         );
     }
@@ -197,9 +197,9 @@ pub fn generate_verb_paradigm(inputs: &VerbAttested) -> Vec<VerbCell> {
     if let Some(k1) = inputs.konj_ii_1sg {
         for (person, number, form, attested) in past_paradigm(k1) {
             let source = if attested {
-                Source::Lexicon
+                Source::Attested
             } else {
-                Source::Generated
+                Source::Inflected
             };
             push(
                 &mut out,
@@ -217,7 +217,7 @@ pub fn generate_verb_paradigm(inputs: &VerbAttested) -> Vec<VerbCell> {
             &mut out,
             s,
             inf,
-            Source::Lexicon,
+            Source::Attested,
             features_imperativ(Number::Sg),
         );
     }
@@ -226,7 +226,7 @@ pub fn generate_verb_paradigm(inputs: &VerbAttested) -> Vec<VerbCell> {
             &mut out,
             s,
             inf,
-            Source::Lexicon,
+            Source::Attested,
             features_imperativ(Number::Pl),
         );
     }
@@ -235,7 +235,7 @@ pub fn generate_verb_paradigm(inputs: &VerbAttested) -> Vec<VerbCell> {
     // For a handful of highly irregular verbs (sein, haben, werden, …)
     // the rule-derived plural Pres Ind / Konj I / PtcPres forms are
     // wrong. The override table below replaces those cells with curated
-    // surfaces. Each override is tagged Source::Lexicon since the
+    // surfaces. Each override is tagged Source::Attested since the
     // surface is hand-attested by the maintainer.
     apply_suppletive_overrides(inf, &mut out);
 
@@ -243,7 +243,7 @@ pub fn generate_verb_paradigm(inputs: &VerbAttested) -> Vec<VerbCell> {
 }
 
 /// One override rule: replace any output cell whose features match
-/// `matches_features` with `(surface, Source::Lexicon)`.
+/// `matches_features` with `(surface, Source::Attested)`.
 struct OverrideCell {
     /// Optional feature matchers; `None` means "match anything for this slot".
     person: Option<Person>,
@@ -363,7 +363,7 @@ fn apply_suppletive_overrides(infinitive: &str, out: &mut Vec<VerbCell>) {
             infinitive,
             UPOS::VERB,
             ov.target_features(),
-            Source::Lexicon,
+            Source::Attested,
         );
         out.push((ov.surface.to_string(), analysis));
     }
@@ -668,19 +668,19 @@ mod tests {
         let cells = generate_verb_paradigm(&lieben_inputs());
         assert_eq!(
             find(&cells, None, None, None, None, Some(VerbForm::Inf)),
-            vec![("lieben".into(), Source::Generated)]
+            vec![("lieben".into(), Source::Inflected)]
         );
         assert_eq!(
             find(&cells, None, None, None, None, Some(VerbForm::InfZu)),
-            vec![("zu lieben".into(), Source::Generated)]
+            vec![("zu lieben".into(), Source::Inflected)]
         );
         assert_eq!(
             find(&cells, None, None, None, None, Some(VerbForm::PtcPres)),
-            vec![("liebend".into(), Source::Generated)]
+            vec![("liebend".into(), Source::Inflected)]
         );
         assert_eq!(
             find(&cells, None, None, None, None, Some(VerbForm::PtcPerf)),
-            vec![("geliebt".into(), Source::Lexicon)]
+            vec![("geliebt".into(), Source::Attested)]
         );
     }
 
@@ -699,27 +699,27 @@ mod tests {
         };
         assert_eq!(
             pi(Person::P1, Number::Sg),
-            vec![("liebe".into(), Source::Lexicon)]
+            vec![("liebe".into(), Source::Attested)]
         );
         assert_eq!(
             pi(Person::P2, Number::Sg),
-            vec![("liebst".into(), Source::Lexicon)]
+            vec![("liebst".into(), Source::Attested)]
         );
         assert_eq!(
             pi(Person::P3, Number::Sg),
-            vec![("liebt".into(), Source::Lexicon)]
+            vec![("liebt".into(), Source::Attested)]
         );
         assert_eq!(
             pi(Person::P1, Number::Pl),
-            vec![("lieben".into(), Source::Generated)]
+            vec![("lieben".into(), Source::Inflected)]
         );
         assert_eq!(
             pi(Person::P2, Number::Pl),
-            vec![("liebt".into(), Source::Generated)]
+            vec![("liebt".into(), Source::Inflected)]
         );
         assert_eq!(
             pi(Person::P3, Number::Pl),
-            vec![("lieben".into(), Source::Generated)]
+            vec![("lieben".into(), Source::Inflected)]
         );
     }
 
@@ -739,30 +739,30 @@ mod tests {
         // 1Sg attested as "liebte"; 3Sg = 1Sg in German past.
         assert_eq!(
             past(Person::P1, Number::Sg),
-            vec![("liebte".into(), Source::Lexicon)]
+            vec![("liebte".into(), Source::Attested)]
         );
         assert_eq!(
             past(Person::P3, Number::Sg),
-            vec![("liebte".into(), Source::Generated)]
+            vec![("liebte".into(), Source::Inflected)]
         );
         // 2Sg adds "st" after the -e stem: "liebtest".
         assert_eq!(
             past(Person::P2, Number::Sg),
-            vec![("liebtest".into(), Source::Generated)]
+            vec![("liebtest".into(), Source::Inflected)]
         );
         // 1Pl/3Pl: stem ends in -e, so add just -n: "liebten".
         assert_eq!(
             past(Person::P1, Number::Pl),
-            vec![("liebten".into(), Source::Generated)]
+            vec![("liebten".into(), Source::Inflected)]
         );
         assert_eq!(
             past(Person::P3, Number::Pl),
-            vec![("liebten".into(), Source::Generated)]
+            vec![("liebten".into(), Source::Inflected)]
         );
         // 2Pl: "liebtet".
         assert_eq!(
             past(Person::P2, Number::Pl),
-            vec![("liebtet".into(), Source::Generated)]
+            vec![("liebtet".into(), Source::Inflected)]
         );
     }
 
@@ -782,27 +782,27 @@ mod tests {
         };
         assert_eq!(
             k1(Person::P1, Number::Sg),
-            vec![("liebe".into(), Source::Generated)]
+            vec![("liebe".into(), Source::Inflected)]
         );
         assert_eq!(
             k1(Person::P2, Number::Sg),
-            vec![("liebest".into(), Source::Generated)]
+            vec![("liebest".into(), Source::Inflected)]
         );
         assert_eq!(
             k1(Person::P3, Number::Sg),
-            vec![("liebe".into(), Source::Generated)]
+            vec![("liebe".into(), Source::Inflected)]
         );
         assert_eq!(
             k1(Person::P1, Number::Pl),
-            vec![("lieben".into(), Source::Generated)]
+            vec![("lieben".into(), Source::Inflected)]
         );
         assert_eq!(
             k1(Person::P2, Number::Pl),
-            vec![("liebet".into(), Source::Generated)]
+            vec![("liebet".into(), Source::Inflected)]
         );
         assert_eq!(
             k1(Person::P3, Number::Pl),
-            vec![("lieben".into(), Source::Generated)]
+            vec![("lieben".into(), Source::Inflected)]
         );
     }
 
@@ -822,15 +822,15 @@ mod tests {
         // 1Sg attested as "liebte"; rest derived.
         assert_eq!(
             k2(Person::P1, Number::Sg),
-            vec![("liebte".into(), Source::Lexicon)]
+            vec![("liebte".into(), Source::Attested)]
         );
         assert_eq!(
             k2(Person::P2, Number::Sg),
-            vec![("liebtest".into(), Source::Generated)]
+            vec![("liebtest".into(), Source::Inflected)]
         );
         assert_eq!(
             k2(Person::P1, Number::Pl),
-            vec![("liebten".into(), Source::Generated)]
+            vec![("liebten".into(), Source::Inflected)]
         );
     }
 
@@ -847,8 +847,8 @@ mod tests {
                 Some(VerbForm::Fin),
             )
         };
-        assert_eq!(imp(Number::Sg), vec![("liebe".into(), Source::Lexicon)]);
-        assert_eq!(imp(Number::Pl), vec![("liebt".into(), Source::Lexicon)]);
+        assert_eq!(imp(Number::Sg), vec![("liebe".into(), Source::Attested)]);
+        assert_eq!(imp(Number::Pl), vec![("liebt".into(), Source::Attested)]);
     }
 
     #[test]
@@ -878,27 +878,27 @@ mod tests {
         };
         assert_eq!(
             past(Person::P1, Number::Sg),
-            vec![("sang".into(), Source::Lexicon)]
+            vec![("sang".into(), Source::Attested)]
         );
         assert_eq!(
             past(Person::P2, Number::Sg),
-            vec![("sangst".into(), Source::Generated)]
+            vec![("sangst".into(), Source::Inflected)]
         );
         assert_eq!(
             past(Person::P3, Number::Sg),
-            vec![("sang".into(), Source::Generated)]
+            vec![("sang".into(), Source::Inflected)]
         );
         assert_eq!(
             past(Person::P1, Number::Pl),
-            vec![("sangen".into(), Source::Generated)]
+            vec![("sangen".into(), Source::Inflected)]
         );
         assert_eq!(
             past(Person::P2, Number::Pl),
-            vec![("sangt".into(), Source::Generated)]
+            vec![("sangt".into(), Source::Inflected)]
         );
         assert_eq!(
             past(Person::P3, Number::Pl),
-            vec![("sangen".into(), Source::Generated)]
+            vec![("sangen".into(), Source::Inflected)]
         );
     }
 
@@ -931,11 +931,11 @@ mod tests {
         };
         assert_eq!(
             past(Person::P2, Number::Sg),
-            vec![("aßest".into(), Source::Generated)]
+            vec![("aßest".into(), Source::Inflected)]
         );
         assert_eq!(
             past(Person::P2, Number::Pl),
-            vec![("aßt".into(), Source::Generated)]
+            vec![("aßt".into(), Source::Inflected)]
         );
         assert!(
             !cells.iter().any(|(s, _)| s == "aßst"),
@@ -966,7 +966,7 @@ mod tests {
             Some(Mood::Ind),
             Some(VerbForm::Fin),
         );
-        assert_eq!(pi_2pl, vec![("wartet".into(), Source::Generated)]);
+        assert_eq!(pi_2pl, vec![("wartet".into(), Source::Inflected)]);
     }
 
     #[test]
@@ -997,15 +997,15 @@ mod tests {
         // and "seint" or similar for 2Pl. The override fixes all three.
         assert_eq!(
             pi(Person::P1, Number::Pl),
-            vec![("sind".into(), Source::Lexicon)]
+            vec![("sind".into(), Source::Attested)]
         );
         assert_eq!(
             pi(Person::P2, Number::Pl),
-            vec![("seid".into(), Source::Lexicon)]
+            vec![("seid".into(), Source::Attested)]
         );
         assert_eq!(
             pi(Person::P3, Number::Pl),
-            vec![("sind".into(), Source::Lexicon)]
+            vec![("sind".into(), Source::Attested)]
         );
     }
 
@@ -1036,11 +1036,11 @@ mod tests {
         // 1Sg and 3Sg Konj I should be "sei", not "seie".
         assert_eq!(
             k1(Person::P1, Number::Sg),
-            vec![("sei".into(), Source::Lexicon)]
+            vec![("sei".into(), Source::Attested)]
         );
         assert_eq!(
             k1(Person::P3, Number::Sg),
-            vec![("sei".into(), Source::Lexicon)]
+            vec![("sei".into(), Source::Attested)]
         );
     }
 
@@ -1064,7 +1064,7 @@ mod tests {
             .expect("PtcPres missing");
         // Rule would yield "seind"; override gives "seiend".
         assert_eq!(ptc.0, "seiend");
-        assert_eq!(ptc.1.source, Source::Lexicon);
+        assert_eq!(ptc.1.source, Source::Attested);
     }
 
     #[test]
@@ -1089,7 +1089,7 @@ mod tests {
             .find(|(_, a)| a.features.form == Some(VerbForm::PtcPres))
             .expect("PtcPres missing");
         assert_eq!(ptc.0, "tuend");
-        assert_eq!(ptc.1.source, Source::Lexicon);
+        assert_eq!(ptc.1.source, Source::Attested);
         assert!(
             !cells.iter().any(|(s, _)| s == "tund"),
             "over-generated invalid 'tund'"
@@ -1109,7 +1109,7 @@ mod tests {
             Some(Mood::Ind),
             Some(VerbForm::Fin),
         );
-        assert_eq!(pi_1pl, vec![("lieben".into(), Source::Generated)]);
+        assert_eq!(pi_1pl, vec![("lieben".into(), Source::Inflected)]);
     }
 
     #[test]
