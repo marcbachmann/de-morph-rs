@@ -132,7 +132,7 @@ impl Analyzer {
                         if h.lemma.contains('ß') {
                             let swiss_lemma = h.lemma.replace('ß', "ss");
                             let h_swiss = Analysis {
-                                lemma: swiss_lemma,
+                                lemma: swiss_lemma.into(),
                                 pos: h.pos,
                                 features: h.features,
                                 source: h.source,
@@ -302,7 +302,7 @@ impl Analyzer {
                     continue;
                 }
                 synthesised.push(Analysis {
-                    lemma,
+                    lemma: lemma.into(),
                     pos: a.pos,
                     features: a.features,
                     // Built from parts that are all in the lexicon (left is an
@@ -507,7 +507,7 @@ fn try_lemma_hypothesis(
                 continue;
             }
             let key = (
-                analysis.lemma.clone(),
+                analysis.lemma.to_string(),
                 analysis.pos as u8,
                 PackedFeatures::pack(analysis.features).0,
             );
@@ -546,7 +546,7 @@ fn try_adj_lemma_hypothesis(
             continue;
         }
         let key = (
-            analysis.lemma.clone(),
+            analysis.lemma.to_string(),
             analysis.pos as u8,
             PackedFeatures::pack(analysis.features).0,
         );
@@ -707,7 +707,7 @@ fn try_verb_lemma_hypothesis(
             continue;
         }
         let key = (
-            analysis.lemma.clone(),
+            analysis.lemma.to_string(),
             analysis.pos as u8,
             PackedFeatures::pack(analysis.features).0,
         );

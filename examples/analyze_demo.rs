@@ -1,7 +1,9 @@
 //! Demonstrate the runtime analyzer on the built lexicon.
 //!
-//! Requires `data/lexicon/lexicon.{fst,dat}` to exist; run
-//! `cargo run --release --features extractor --bin build-lexicon` first.
+//! The lexicon is embedded via `include_bytes!`, so `data/lexicon/lexicon.
+//! {fst,dat}` must exist **at compile time**; build it first with
+//! `cargo run --release --features extractor --bin build-lexicon`. Loading
+//! is then zero-copy (see `LEXICON_FST`/`LEXICON_DAT` below).
 //!
 //! Usage:
 //!
@@ -25,7 +27,19 @@
 use std::io::{self, BufRead, IsTerminal};
 use std::time::Instant;
 
-use de_morph::{Analysis, Analyzer, Source};
+use de_morph::{Analysis, Analyzer, Lexicon, Source};
+
+/// The lexicon, embedded into the binary at compile time. `include_bytes!`
+/// places these in the executable's read-only data, so at runtime they are
+/// `&'static [u8]` — demand-paged from the binary image, never read into the
+/// process heap. Paired with [`Lexicon::from_static`], lemma lookups borrow
+/// straight out of these bytes (zero-copy), so no per-analysis allocation and
+/// no resident copy of the ~8 MiB dictionary.
+///
+/// Requires `data/lexicon/lexicon.{fst,dat}` to exist *at compile time* — see
+/// the module docs for how to build them.
+static LEXICON_FST: &[u8] = include_bytes!("../data/lexicon/lexicon.fst");
+static LEXICON_DAT: &[u8] = include_bytes!("../data/lexicon/lexicon.dat");
 
 const SAMPLES: &[&str] = &[
     // Noun forms
@@ -101,9 +115,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Mode::Showcase
     };
 
-    eprintln!("Loading lexicon...");
+    eprintln!("Loading embedded lexicon (zero-copy)...");
     let load_start = Instant::now();
-    let mut analyzer = Analyzer::open("data/lexicon/lexicon.fst", "data/lexicon/lexicon.dat")?;
+    let mut analyzer = Analyzer::from_lexicon(Lexicon::from_static(LEXICON_FST, LEXICON_DAT)?);
     if swiss {
         analyzer = analyzer.with_swiss_orthography(true);
     }

@@ -10,16 +10,20 @@
 //! ```text
 //!   [header                                              : 64 bytes]
 //!     magic                       : [u8; 12]   "DE-MORPH-RS\0"
-//!     version_major               : u16        = 2
-//!     version_minor               : u16        = 0
-//!     flags                       : u32        reserved, must be 0
-//!     num_lemmas                  : u32
-//!     num_analyses                : u32
-//!     lemma_offsets_offset        : u32        offset of lemma_offsets section
-//!     lemma_bytes_offset          : u32        offset of lemma_bytes section
-//!     analyses_offset             : u32        offset of analyses section
-//!     analyses_end                : u32        end byte (file length)
-//!     _reserved                   : [u8; 12]   zeroed
+//!     version_major               : u16        = 6        (offset 12)
+//!     version_minor               : u16        = 0        (offset 14)
+//!     flags                       : u32        reserved   (offset 16)
+//!     num_lemmas                  : u32                   (offset 20)
+//!     num_analyses                : u32        total readings (offset 24)
+//!     lemma_offsets_offset        : u32                   (offset 28)
+//!     lemma_bytes_offset          : u32                   (offset 32)
+//!     analyses_offset             : u32        start of bit-packed groups (offset 36)
+//!     analyses_end                : u32        end byte / file length (offset 40)
+//!     num_shapes                  : u32                   (offset 44)
+//!     shape_table_offset          : u32                   (offset 48)
+//!     lemma_bits                  : u8         bit width of a lemma_id (offset 52)
+//!     shape_bits                  : u8         bit width of a shape_id (offset 53)
+//!     _reserved                   : [u8; 10]   zeroed     (offset 54)
 //!
 //!   [lemma_offsets section                : 4 * (num_lemmas + 1) bytes]
 //!     u32 offset for lemma 0, 1, ..., num_lemmas
@@ -37,21 +41,42 @@
 //!     the whole corpus, so analyses reference one by a small id instead
 //!     of repeating ~40 bits per record. See `Shape` below.
 //!
-//!   [analyses section            : 4 * num_analyses bytes]
-//!     Repeated 4-byte u32 records: `lemma_id (20 bits) | shape_id
-//!     (12 bits)`. See `AnalysisRecord` below. v1 used 12-byte records,
-//!     v2-v4 packed to 8 bytes (a self-contained u64); v5 factors out
-//!     the shape table so each record is just two indices = 4 bytes.
+//!   [analyses (groups) section   : variable, bit-packed]
+//!     Per surface, a byte-aligned, LSB-first bit-packed run of its
+//!     analyses, grouped by lemma. See "v6 group encoding" below. The
+//!     FST value `(count, byte_offset)` gives a surface's reading count
+//!     and the byte offset of its run within this section.
 //! ```
 //!
-//! # v5 analysis record (4 bytes) and shape entry (6 bytes)
+//! # v6 group encoding (lemma-factored, bit-packed)
 //!
-//! Each analysis record is a little-endian u32:
+//! A surface's analyses almost always share one lemma (99%+ of
+//! surfaces) and differ only in shape. v5 stored `lemma_id` in every
+//! 4-byte record, repeating the high-entropy half ~4× per surface. v6
+//! factors the lemma out: per surface, the readings are sorted by
+//! `(lemma_id, shape_id)` and emitted so a lemma_id is written once per
+//! distinct lemma rather than once per reading.
+//!
+//! Field widths are data-fit and recorded in the header:
+//!   `lemma_bits = bit_width(num_lemmas)`, `shape_bits = bit_width(num_shapes)`.
+//! For the current lexicon that is 18 and 10 bits (vs the 20/12 maxima).
+//!
+//! Per surface (`count` readings, the FST value's high half), bits are
+//! written LSB-first, then byte-aligned:
 //!
 //! ```text
-//!   bits 0-19    lemma_id   (20 bits, up to 1,048,576 lemmas)
-//!   bits 20-31   shape_id   (12 bits, up to 4096 distinct shapes)
+//!   reading 0 :                       lemma_id : lemma_bits
+//!                                      shape_id : shape_bits
+//!   reading i :  new_lemma : 1 bit
+//!                (if new)             lemma_id : lemma_bits
+//!                                      shape_id : shape_bits
 //! ```
+//!
+//! `new_lemma = 1` iff this reading's lemma differs from the previous
+//! reading's; because readings are lemma-sorted, that is exactly once
+//! per distinct lemma. The decoder carries the current lemma forward
+//! when the bit is 0. Random access is preserved: the FST offset seeks
+//! straight to the surface's byte-aligned run.
 //!
 //! Each shape-table entry is 6 little-endian bytes:
 //!
@@ -61,11 +86,11 @@
 //!   byte  5      source (bits 0-1) | aux (bits 2-3)
 //! ```
 //!
-//! v5 introduces the shape table: with only ~400 distinct
-//! (pos, source, aux, packed_features) tuples across millions of
-//! records, interning them halves the analyses section (8→4 bytes per
-//! record). v4 stored the full analysis in each 8-byte record; v3
-//! widened POS from 4→5 bits for the 17th UPOS tag (`Propn`).
+//! History: v5 introduced the shape table (interning the
+//! (pos, source, aux, packed_features) tuple), shrinking each record to
+//! a 4-byte `(lemma_id|shape_id)` pair. v4 stored the full analysis in
+//! 8 bytes; v3 widened POS from 4→5 bits for the 17th UPOS tag
+//! (`Propn`). v6 keeps the shape table and adds lemma-factoring.
 
 /// File magic, including a trailing null byte so the length is 12.
 pub const MAGIC: [u8; 12] = *b"DE-MORPH-RS\0";
@@ -73,13 +98,18 @@ pub const MAGIC: [u8; 12] = *b"DE-MORPH-RS\0";
 /// Fixed header size.
 pub const HEADER_SIZE: usize = 64;
 
-/// Current format version. v3 widens the POS field from 4 → 5 bits to
-/// admit the 17th UPOS tag (`Propn`). v2 packed the analysis record
-/// from 12 bytes (v1) into 8 bytes; v3 keeps the 8-byte size.
-pub const VERSION_MAJOR: u16 = 5;
+/// Current format version. v6 lemma-factors the analyses section: per
+/// surface, readings are grouped by lemma and bit-packed, writing a
+/// lemma_id once per distinct lemma instead of once per reading. v5
+/// interned the (pos, source, aux, features) shape; v3 widened POS 4→5
+/// bits for `Propn`; v2 packed the v1 12-byte record to 8 bytes.
+pub const VERSION_MAJOR: u16 = 6;
 pub const VERSION_MINOR: u16 = 0;
 
-/// Size of one analysis record on disk (bytes): `lemma_id | shape_id`.
+/// Size of the logical analysis record (`lemma_id | shape_id`) as a
+/// packed u32. Up to v5 this was also the on-disk record size; v6
+/// bit-packs the analyses section, so this is now only the width of the
+/// in-memory [`AnalysisRecord`] codec, not a per-record on-disk stride.
 pub const ANALYSIS_RECORD_SIZE: usize = 4;
 
 /// Size of one shape-table entry on disk (bytes).
@@ -91,9 +121,12 @@ pub const MAX_LEMMA_ID: u32 = (1 << 20) - 1;
 /// Maximum number of distinct shapes (12-bit `shape_id`).
 pub const MAX_SHAPE_ID: u32 = (1 << 12) - 1;
 
-/// One analysis record: a (lemma, shape) index pair. The wire form is a
-/// little-endian u32 with `lemma_id` in the low 20 bits and `shape_id`
-/// in the high 12 bits.
+/// One analysis record: a (lemma, shape) index pair. This is the
+/// in-memory/logical unit; `to_u32`/`to_bytes` pack it as a u32
+/// (`lemma_id` low 20 bits, `shape_id` high 12 bits), which was the v5
+/// on-disk record. **In v6 the on-disk form is bit-packed** (see the
+/// module-level "v6 group encoding"); this struct is what the loader
+/// reconstructs per reading, not a fixed-width on-disk record.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AnalysisRecord {
     pub lemma_id: u32,
@@ -183,6 +216,124 @@ pub fn unpack_fst_value(value: u64) -> (u32, u32) {
     (count, offset)
 }
 
+/// Number of bits needed to represent the index values `0..num_values`
+/// (i.e. `0..=num_values-1`). Returns 0 when there is at most one value,
+/// in which case the index is always 0 and needs no bits on the wire.
+#[inline]
+pub fn bit_width(num_values: usize) -> u32 {
+    if num_values <= 1 {
+        0
+    } else {
+        (num_values as u64 - 1).ilog2() + 1
+    }
+}
+
+/// LSB-first bit writer. The first bits written occupy the low-order
+/// positions of each output byte; this matches [`BitReader`]. Call
+/// [`BitWriter::align`] to flush a partial byte at a record boundary.
+#[derive(Default)]
+pub struct BitWriter {
+    buf: Vec<u8>,
+    acc: u64,
+    nbits: u32,
+}
+
+impl BitWriter {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Append the low `width` bits of `value` (LSB first). `width` 0 is a
+    /// no-op; `width` must be ≤ 32 and `value` must fit in `width` bits.
+    #[inline]
+    pub fn write(&mut self, value: u32, width: u32) {
+        if width == 0 {
+            return;
+        }
+        debug_assert!(width <= 32);
+        debug_assert!(width == 32 || value < (1u32 << width), "value overflows width");
+        self.acc |= (value as u64) << self.nbits;
+        self.nbits += width;
+        while self.nbits >= 8 {
+            self.buf.push((self.acc & 0xFF) as u8);
+            self.acc >>= 8;
+            self.nbits -= 8;
+        }
+    }
+
+    /// Flush a partial byte so the next write starts byte-aligned.
+    #[inline]
+    pub fn align(&mut self) {
+        if self.nbits > 0 {
+            self.buf.push((self.acc & 0xFF) as u8);
+            self.acc = 0;
+            self.nbits = 0;
+        }
+    }
+
+    /// Current byte length. Must be called on a byte boundary (i.e. right
+    /// after [`BitWriter::new`] or [`BitWriter::align`]).
+    #[inline]
+    pub fn byte_len(&self) -> usize {
+        debug_assert_eq!(self.nbits, 0, "byte_len called mid-byte");
+        self.buf.len()
+    }
+
+    /// Finish, flushing any partial trailing byte.
+    pub fn into_bytes(mut self) -> Vec<u8> {
+        self.align();
+        self.buf
+    }
+}
+
+/// LSB-first bit reader over a byte slice, matching [`BitWriter`]. Bits
+/// beyond the end of the slice read as 0 (so a truncated/corrupt index
+/// yields recoverable zeros rather than a panic).
+pub struct BitReader<'a> {
+    data: &'a [u8],
+    pos: usize,
+    acc: u64,
+    nbits: u32,
+}
+
+impl<'a> BitReader<'a> {
+    /// Begin reading at byte offset `start` (must be byte-aligned, as
+    /// every surface's run is).
+    #[inline]
+    pub fn new(data: &'a [u8], start: usize) -> Self {
+        Self {
+            data,
+            pos: start,
+            acc: 0,
+            nbits: 0,
+        }
+    }
+
+    /// Read `width` bits (LSB first). `width` 0 returns 0.
+    #[inline]
+    pub fn read(&mut self, width: u32) -> u32 {
+        if width == 0 {
+            return 0;
+        }
+        debug_assert!(width <= 32);
+        while self.nbits < width {
+            let byte = self.data.get(self.pos).copied().unwrap_or(0);
+            self.pos += 1;
+            self.acc |= (byte as u64) << self.nbits;
+            self.nbits += 8;
+        }
+        let mask = if width == 32 {
+            u64::MAX
+        } else {
+            (1u64 << width) - 1
+        };
+        let v = (self.acc & mask) as u32;
+        self.acc >>= width;
+        self.nbits -= width;
+        v
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -191,6 +342,51 @@ mod tests {
     fn record_size_is_4_bytes_on_disk() {
         assert_eq!(ANALYSIS_RECORD_SIZE, 4);
         assert_eq!(SHAPE_ENTRY_SIZE, 6);
+    }
+
+    #[test]
+    fn bit_width_matches_value_ranges() {
+        assert_eq!(bit_width(0), 0);
+        assert_eq!(bit_width(1), 0);
+        assert_eq!(bit_width(2), 1);
+        assert_eq!(bit_width(4), 2);
+        assert_eq!(bit_width(5), 3);
+        assert_eq!(bit_width(571), 10);
+        assert_eq!(bit_width(165_998), 18);
+    }
+
+    #[test]
+    fn bit_writer_reader_roundtrip_mixed_widths() {
+        // Two byte-aligned "records" with assorted widths, including a
+        // 0-width field (the single-lemma case) and a 1-bit flag.
+        let mut w = BitWriter::new();
+        w.write(0b101, 3);
+        w.write(1, 1);
+        w.write(300, 10);
+        w.write(0, 0); // no-op
+        w.align();
+        let rec2_start = w.byte_len();
+        w.write(165_997, 18);
+        w.write(570, 10);
+        let bytes = w.into_bytes();
+
+        let mut r = BitReader::new(&bytes, 0);
+        assert_eq!(r.read(3), 0b101);
+        assert_eq!(r.read(1), 1);
+        assert_eq!(r.read(10), 300);
+        assert_eq!(r.read(0), 0);
+
+        let mut r2 = BitReader::new(&bytes, rec2_start);
+        assert_eq!(r2.read(18), 165_997);
+        assert_eq!(r2.read(10), 570);
+    }
+
+    #[test]
+    fn bit_reader_past_end_yields_zero() {
+        let bytes = [0xFFu8];
+        let mut r = BitReader::new(&bytes, 0);
+        assert_eq!(r.read(8), 0xFF);
+        assert_eq!(r.read(8), 0); // past end
     }
 
     #[test]

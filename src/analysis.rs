@@ -35,6 +35,7 @@
 //!   in Beesley & Karttunen, "Finite State Morphology" (2003); that book
 //!   was not consulted while writing this file.
 
+use std::borrow::Cow;
 use std::fmt;
 
 /// Coarse part-of-speech tag — full Universal Dependencies UPOS inventory
@@ -531,7 +532,12 @@ impl PackedFeatures {
 /// borrowed from the analyzer's interned buffer.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Analysis {
-    pub lemma: String,
+    /// The lemma. `Cow::Borrowed` when it points straight into the
+    /// lexicon's (zero-copy) interned byte table; `Cow::Owned` when it is
+    /// synthesised by the paradigm engine or otherwise computed. The
+    /// `'static` lifetime is satisfied either by an `include_bytes!`
+    /// lexicon (truly static) or by an owned string.
+    pub lemma: Cow<'static, str>,
     pub pos: UPOS,
     pub features: Features,
     pub source: Source,
@@ -552,7 +558,10 @@ impl Analysis {
         source: Source,
     ) -> Self {
         Self {
-            lemma: lemma.into(),
+            // Constructed lemmas (paradigm/closed-class/compounds) are
+            // owned; the zero-copy borrowed path is the lexicon decoder,
+            // which builds the struct directly with a `Cow::Borrowed`.
+            lemma: Cow::Owned(lemma.into()),
             pos,
             features,
             source,

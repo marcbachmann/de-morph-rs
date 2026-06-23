@@ -8,13 +8,14 @@
 //! Lookups are O(|surface|) on the FST plus a small constant per
 //! analysis returned. No allocation per lookup beyond the result `Vec`.
 
+use std::borrow::Cow;
 use std::path::Path;
 
 use fst::Map as FstMap;
 
 use crate::analysis::{Analysis, Aux, Case, Gender, Number, PackedFeatures, Source, UPOS};
 use crate::lexicon::format::{
-    unpack_fst_value, AnalysisRecord, Shape, ANALYSIS_RECORD_SIZE, HEADER_SIZE, MAGIC,
+    bit_width, unpack_fst_value, AnalysisRecord, BitReader, Shape, HEADER_SIZE, MAGIC,
     SHAPE_ENTRY_SIZE, VERSION_MAJOR,
 };
 
@@ -43,6 +44,12 @@ pub enum LoadError {
     InvalidShape(u16),
     /// A lemma in the intern table was not valid UTF-8.
     InvalidLemmaUtf8,
+    /// A header field is inconsistent with the rest of the header (e.g.
+    /// a packed-field bit width that does not match the table size it is
+    /// derived from). Signals a corrupt or mis-built side table.
+    CorruptHeader {
+        field: &'static str,
+    },
 }
 
 impl std::fmt::Display for LoadError {
@@ -60,6 +67,7 @@ impl std::fmt::Display for LoadError {
             Self::InvalidSource(s) => write!(f, "invalid source byte: {s}"),
             Self::InvalidShape(s) => write!(f, "shape id out of range: {s}"),
             Self::InvalidLemmaUtf8 => write!(f, "lemma intern table contains invalid UTF-8"),
+            Self::CorruptHeader { field } => write!(f, "corrupt side-table header field: {field}"),
         }
     }
 }
@@ -146,15 +154,24 @@ impl CompoundSplit {
 /// In-memory, read-only morphological lexicon.
 pub struct Lexicon {
     fst: FstMap<Vec<u8>>,
-    side: Vec<u8>,
+    /// The side table. `Cow::Borrowed` for an `include_bytes!`/`'static`
+    /// lexicon (zero-copy lemmas) or `Cow::Owned` for runtime-loaded bytes.
+    side: Cow<'static, [u8]>,
     /// Offsets parsed once from the header for fast access.
     lemma_offsets_offset: usize,
     lemma_bytes_offset: usize,
-    /// Where the analyses section ends; bounds-checked in `analyze`.
+    /// Bounds of the bit-packed analyses section; a surface's FST offset
+    /// must land inside `[analyses_offset, analyses_end)`. Checked in
+    /// `analyze` so a corrupt offset can't decode header/lemma bytes.
+    analyses_offset: usize,
     analyses_end: usize,
     num_lemmas: usize,
     #[allow(dead_code)]
     num_analyses: usize,
+    /// Bit widths of the packed `lemma_id` / `shape_id` fields, read from
+    /// the header. Derived at build time from the table sizes.
+    lemma_bits: u32,
+    shape_bits: u32,
     /// Interned analysis shapes, decoded once at load and indexed by the
     /// `shape_id` in each record.
     shapes: Vec<Shape>,
@@ -171,9 +188,26 @@ impl Lexicon {
         Self::from_bytes(fst_bytes, side_bytes)
     }
 
-    /// Construct from raw bytes (e.g. for embedded lexica or tests).
+    /// Construct from owned bytes (runtime-loaded files or tests). Lemmas
+    /// are materialised as owned strings. For zero-copy borrowed lemmas,
+    /// use [`Lexicon::from_static`] (e.g. with `include_bytes!`).
     pub fn from_bytes(fst_bytes: Vec<u8>, side_bytes: Vec<u8>) -> Result<Self, LoadError> {
-        let fst = FstMap::new(fst_bytes)?;
+        Self::from_parts(FstMap::new(fst_bytes)?, Cow::Owned(side_bytes))
+    }
+
+    /// Construct from `'static` bytes (typically `include_bytes!`),
+    /// enabling zero-copy borrowed lemmas: the side table is borrowed, not
+    /// copied (the smaller FST index is copied once at load). No heap copy
+    /// of the lemma dictionary, and pages are demand-loaded from the binary
+    /// image rather than read into the process heap.
+    pub fn from_static(
+        fst_bytes: &'static [u8],
+        side_bytes: &'static [u8],
+    ) -> Result<Self, LoadError> {
+        Self::from_parts(FstMap::new(fst_bytes.to_vec())?, Cow::Borrowed(side_bytes))
+    }
+
+    fn from_parts(fst: FstMap<Vec<u8>>, side_bytes: Cow<'static, [u8]>) -> Result<Self, LoadError> {
         if side_bytes.len() < HEADER_SIZE {
             return Err(LoadError::Truncated { field: "header" });
         }
@@ -198,6 +232,8 @@ impl Lexicon {
         let num_shapes = u32::from_le_bytes(side_bytes[44..48].try_into().unwrap()) as usize;
         let shape_table_offset =
             u32::from_le_bytes(side_bytes[48..52].try_into().unwrap()) as usize;
+        let lemma_bits = side_bytes[52] as u32;
+        let shape_bits = side_bytes[53] as u32;
 
         if side_bytes.len() < analyses_end {
             return Err(LoadError::Truncated {
@@ -215,6 +251,15 @@ impl Lexicon {
                 field: "shape table",
             });
         }
+        // The packed-field widths are a deterministic function of the
+        // table sizes. Validate the stored header bytes match, so a
+        // corrupt/mis-built width can't silently mis-decode every record.
+        if lemma_bits != bit_width(num_lemmas) {
+            return Err(LoadError::CorruptHeader { field: "lemma_bits" });
+        }
+        if shape_bits != bit_width(num_shapes) {
+            return Err(LoadError::CorruptHeader { field: "shape_bits" });
+        }
 
         // Decode the shape table once (a few hundred entries).
         let mut shapes = Vec::with_capacity(num_shapes);
@@ -230,9 +275,12 @@ impl Lexicon {
             side: side_bytes,
             lemma_offsets_offset,
             lemma_bytes_offset,
+            analyses_offset,
             analyses_end,
             num_lemmas,
             num_analyses,
+            lemma_bits,
+            shape_bits,
             shapes,
         })
     }
@@ -567,14 +615,25 @@ impl Lexicon {
         let (count, abs_offset) = unpack_fst_value(packed);
         let mut out = Vec::with_capacity(count as usize);
         let start = abs_offset as usize;
-        let end = start + (count as usize) * ANALYSIS_RECORD_SIZE;
-        if end > self.analyses_end {
-            // Corrupt index — return empty rather than panic.
+        if start < self.analyses_offset || start > self.analyses_end {
+            // Corrupt index pointing outside the analyses section — return
+            // empty rather than decode header/lemma/shape bytes as records.
             return out;
         }
-        let records = &self.side[start..end];
-        for chunk in records.chunks_exact(ANALYSIS_RECORD_SIZE) {
-            let rec = AnalysisRecord::from_bytes(chunk);
+        // Decode the surface's bit-packed, lemma-factored run. Reading 0
+        // carries an explicit lemma_id; each later reading carries a
+        // 1-bit `new_lemma` flag and only re-reads the lemma when it
+        // changes. The reader yields zeros past the section end, and
+        // `materialise` rejects out-of-range ids, so a corrupt index
+        // degrades gracefully rather than panicking.
+        let mut reader = BitReader::new(&self.side, start);
+        let mut lemma_id = 0u32;
+        for i in 0..count {
+            if i == 0 || reader.read(1) == 1 {
+                lemma_id = reader.read(self.lemma_bits);
+            }
+            let shape_id = reader.read(self.shape_bits) as u16;
+            let rec = AnalysisRecord { lemma_id, shape_id };
             match self.materialise(&rec) {
                 Ok(a) => out.push(a),
                 Err(_) => continue,
@@ -622,11 +681,19 @@ impl Lexicon {
         // `aux` rides in the shape entry, not the PackedFeatures word.
         features.aux = Aux::from_code(shape.aux);
         let lemma = self.lemma(rec.lemma_id)?;
-        Ok(Analysis::with_source(lemma, pos, features, source))
+        // Build the struct directly so a borrowed lemma stays borrowed
+        // (`with_source` would force it to an owned `String`).
+        Ok(Analysis {
+            lemma,
+            pos,
+            features,
+            source,
+        })
     }
 
-    /// Read lemma N from the intern table.
-    fn lemma(&self, id: u32) -> Result<String, LoadError> {
+    /// Read lemma N from the intern table. Borrowed (zero-copy) when the
+    /// side table is `'static`; owned otherwise.
+    fn lemma(&self, id: u32) -> Result<Cow<'static, str>, LoadError> {
         let id = id as usize;
         if id >= self.num_lemmas {
             return Err(LoadError::Truncated {
@@ -642,10 +709,24 @@ impl Lexicon {
             as usize;
         let bytes_start = self.lemma_bytes_offset + start;
         let bytes_end = self.lemma_bytes_offset + end;
-        let slice = &self.side[bytes_start..bytes_end];
-        std::str::from_utf8(slice)
-            .map(str::to_string)
-            .map_err(|_| LoadError::InvalidLemmaUtf8)
+        match &self.side {
+            // `'static` side table: hand back a borrow into it (no copy).
+            Cow::Borrowed(bytes) => {
+                let data: &'static [u8] = bytes;
+                let slice = &data[bytes_start..bytes_end];
+                std::str::from_utf8(slice)
+                    .map(Cow::Borrowed)
+                    .map_err(|_| LoadError::InvalidLemmaUtf8)
+            }
+            // Owned side table: the bytes are tied to `&self`, so we must
+            // copy out an owned string.
+            Cow::Owned(vec) => {
+                let slice = &vec[bytes_start..bytes_end];
+                std::str::from_utf8(slice)
+                    .map(|s| Cow::Owned(s.to_owned()))
+                    .map_err(|_| LoadError::InvalidLemmaUtf8)
+            }
+        }
     }
 }
 
@@ -727,6 +808,43 @@ mod tests {
         let mut side = Vec::new();
         b.finish(&mut fst, &mut side).unwrap();
         Lexicon::from_bytes(fst, side).unwrap()
+    }
+
+    #[test]
+    fn from_static_borrows_lemmas_while_from_bytes_owns_them() {
+        let mut b = LexiconBuilder::new();
+        b.add(
+            "Tisch",
+            "Tisch",
+            UPOS::NOUN,
+            Features::noun_form(Gender::Masc, Number::Sg, Case::Nom),
+            Source::Attested,
+        )
+        .unwrap();
+        let mut fst = Vec::new();
+        let mut side = Vec::new();
+        b.finish(&mut fst, &mut side).unwrap();
+
+        // `from_static`: the lemma must be a zero-copy borrow into the side
+        // table. Leaking here stands in for `include_bytes!` 'static data.
+        let fst_static: &'static [u8] = Box::leak(fst.clone().into_boxed_slice());
+        let side_static: &'static [u8] = Box::leak(side.clone().into_boxed_slice());
+        let lex = Lexicon::from_static(fst_static, side_static).unwrap();
+        let a = lex.analyze("Tisch");
+        assert_eq!(a.len(), 1);
+        assert_eq!(a[0].lemma, "Tisch");
+        assert!(
+            matches!(a[0].lemma, std::borrow::Cow::Borrowed(_)),
+            "from_static should yield a borrowed (zero-copy) lemma"
+        );
+
+        // `from_bytes`: owned bytes => owned lemma (allocates, as before).
+        let lex2 = Lexicon::from_bytes(fst, side).unwrap();
+        let a2 = lex2.analyze("Tisch");
+        assert!(
+            matches!(a2[0].lemma, std::borrow::Cow::Owned(_)),
+            "from_bytes should yield an owned lemma"
+        );
     }
 
     #[test]

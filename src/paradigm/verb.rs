@@ -460,7 +460,7 @@ fn join_separable(
             } else {
                 format!("{prefix}{surface}")
             };
-            analysis.lemma = separable_inf.to_string();
+            analysis.lemma = separable_inf.to_string().into();
             (joined, analysis)
         })
         .collect()

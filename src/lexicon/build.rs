@@ -17,8 +17,8 @@ use fst::MapBuilder;
 
 use crate::analysis::{Aux, Features, PackedFeatures, Source, UPOS};
 use crate::lexicon::format::{
-    pack_fst_value, AnalysisRecord, Shape, ANALYSIS_RECORD_SIZE, HEADER_SIZE, MAGIC, MAX_SHAPE_ID,
-    SHAPE_ENTRY_SIZE, VERSION_MAJOR, VERSION_MINOR,
+    bit_width, pack_fst_value, BitWriter, Shape, HEADER_SIZE, MAGIC, MAX_SHAPE_ID, SHAPE_ENTRY_SIZE,
+    VERSION_MAJOR, VERSION_MINOR,
 };
 
 /// Error returned by [`LexiconBuilder::finish`].
@@ -201,21 +201,18 @@ impl LexiconBuilder {
         //   lemma_offsets [(num_lemmas + 1) * 4 bytes]
         //   lemma_bytes
         //   shape_table [num_shapes * SHAPE_ENTRY_SIZE bytes]
-        //   analyses [num_analyses * ANALYSIS_RECORD_SIZE bytes]
+        //   analyses (bit-packed, lemma-factored groups; see format.rs)
 
-        // Build the analyses block, interning each record's (pos, source,
-        // aux, features) tuple into the shape table and storing only a
-        // (lemma_id, shape_id) pair per record. Per-surface byte spans are
-        // recorded relative to the start of the analyses block; absolute
-        // offsets are resolved once the shape-table size is known.
-        let mut analyses_bytes: Vec<u8> = Vec::new();
+        // Pass 1: intern each record's (pos, source, aux, features) tuple
+        // into the shape table and collect every surface's readings as
+        // (lemma_id, shape_id) pairs, sorted by lemma then shape so equal
+        // lemmas are contiguous (order within a surface is not
+        // semantically meaningful — ingest order is already arbitrary).
         let mut shape_ids: HashMap<Shape, u16> = HashMap::new();
         let mut shapes: Vec<Shape> = Vec::new();
-        let mut surface_spans: Vec<(String, u32, u64)> = Vec::with_capacity(by_surface.len());
+        let mut per_surface: Vec<(String, Vec<(u32, u16)>)> = Vec::with_capacity(by_surface.len());
         for (surface, records) in by_surface {
-            let count =
-                u32::try_from(records.len()).map_err(|_| BuildError::TooManyAnalysesPerSurface)?;
-            let offset_in_analyses = analyses_bytes.len() as u64;
+            let mut readings: Vec<(u32, u16)> = Vec::with_capacity(records.len());
             for rec in records {
                 let shape = Shape {
                     packed_features: rec.features.0,
@@ -235,15 +232,49 @@ impl LexiconBuilder {
                         id
                     }
                 };
-                let on_disk = AnalysisRecord {
-                    lemma_id: rec.lemma_id,
-                    shape_id,
-                };
-                analyses_bytes.extend_from_slice(&on_disk.to_bytes());
+                readings.push((rec.lemma_id, shape_id));
             }
-            surface_spans.push((surface, count, offset_in_analyses));
+            readings.sort_unstable();
+            // Defensive: `add` already dedups exact (lemma, shape, ...)
+            // tuples, which map 1:1 onto (lemma_id, shape_id) pairs.
+            readings.dedup();
+            per_surface.push((surface, readings));
         }
         let num_shapes = u32::try_from(shapes.len()).map_err(|_| BuildError::TooManyShapes)?;
+
+        // Field widths derived from table sizes, recorded in the header so
+        // the loader unpacks identically.
+        let lemma_bits = bit_width(num_lemmas as usize);
+        let shape_bits = bit_width(shapes.len());
+
+        // Pass 2: bit-pack each surface's run (byte-aligned), factoring
+        // the lemma out — write lemma_id once per distinct lemma, marked
+        // by a 1-bit `new_lemma` flag on every reading after the first.
+        let mut groups = BitWriter::new();
+        let mut surface_spans: Vec<(String, u32, u64)> = Vec::with_capacity(per_surface.len());
+        let mut total_readings: u64 = 0;
+        for (surface, readings) in per_surface {
+            let count =
+                u32::try_from(readings.len()).map_err(|_| BuildError::TooManyAnalysesPerSurface)?;
+            let offset_in_analyses = groups.byte_len() as u64;
+            let mut prev_lemma = u32::MAX; // never a valid lemma_id (< 2^20)
+            for (i, &(lemma_id, shape_id)) in readings.iter().enumerate() {
+                if i == 0 {
+                    groups.write(lemma_id, lemma_bits);
+                } else if lemma_id == prev_lemma {
+                    groups.write(0, 1);
+                } else {
+                    groups.write(1, 1);
+                    groups.write(lemma_id, lemma_bits);
+                }
+                groups.write(shape_id as u32, shape_bits);
+                prev_lemma = lemma_id;
+            }
+            groups.align();
+            total_readings += count as u64;
+            surface_spans.push((surface, count, offset_in_analyses));
+        }
+        let analyses_bytes = groups.into_bytes();
 
         let lemma_offsets_offset = HEADER_SIZE as u64;
         let lemma_offsets_bytes = (num_lemmas as u64 + 1) * 4;
@@ -253,8 +284,8 @@ impl LexiconBuilder {
         let shape_table_bytes = num_shapes as u64 * SHAPE_ENTRY_SIZE as u64;
         let analyses_offset = shape_table_offset + shape_table_bytes;
 
-        let num_analyses = u32::try_from(analyses_bytes.len() / ANALYSIS_RECORD_SIZE)
-            .map_err(|_| BuildError::TooManyAnalyses)?;
+        let num_analyses =
+            u32::try_from(total_readings).map_err(|_| BuildError::TooManyAnalyses)?;
         let analyses_end = analyses_offset + analyses_bytes.len() as u64;
         let analyses_end_u32 =
             u32::try_from(analyses_end).map_err(|_| BuildError::SideTableTooLarge)?;
@@ -298,7 +329,9 @@ impl LexiconBuilder {
         header[40..44].copy_from_slice(&analyses_end_u32.to_le_bytes());
         header[44..48].copy_from_slice(&num_shapes.to_le_bytes());
         header[48..52].copy_from_slice(&shape_table_offset_u32.to_le_bytes());
-        // bytes 52..64 are reserved (already zeroed).
+        header[52] = lemma_bits as u8;
+        header[53] = shape_bits as u8;
+        // bytes 54..64 are reserved (already zeroed).
         side_out.write_all(&header)?;
 
         // Lemma offsets: (num_lemmas + 1) * u32, each relative to
@@ -332,7 +365,7 @@ impl LexiconBuilder {
             num_analyses: num_analyses as u64,
             num_surfaces: fst_entries.len() as u64,
             total_records,
-            side_table_bytes: analyses_end as u64,
+            side_table_bytes: analyses_end,
         })
     }
 }
@@ -453,5 +486,95 @@ mod tests {
 
         // Unknown surface returns empty.
         assert!(lex.analyze("Quitsch").is_empty());
+    }
+
+    #[test]
+    fn single_lemma_and_shape_zero_width_roundtrip() {
+        // One lemma and one identical shape across surfaces drive both
+        // lemma_bits and shape_bits to 0 — the v6 width-0 codec path.
+        let mut b = LexiconBuilder::new();
+        let feats = Features::noun(Gender::Masc);
+        for surf in ["alpha", "beta", "gamma"] {
+            b.add(surf, "x", UPOS::NOUN, feats, Source::Attested).unwrap();
+        }
+        let mut fst = Vec::new();
+        let mut side = Vec::new();
+        let stats = b.finish(&mut fst, &mut side).unwrap();
+        assert_eq!(stats.num_lemmas, 1);
+        assert_eq!(stats.num_surfaces, 3);
+        assert_eq!(stats.num_analyses, 3);
+        assert_eq!(side[52], 0, "lemma_bits should be 0 for one lemma");
+        assert_eq!(side[53], 0, "shape_bits should be 0 for one shape");
+
+        let lex = Lexicon::from_bytes(fst, side).unwrap();
+        for surf in ["alpha", "beta", "gamma"] {
+            let a = lex.analyze(surf);
+            assert_eq!(a.len(), 1, "{surf}");
+            assert_eq!(a[0].lemma, "x");
+            assert_eq!(a[0].pos, UPOS::NOUN);
+            assert_eq!(a[0].features.gender, Some(Gender::Masc));
+        }
+        assert!(lex.analyze("delta").is_empty());
+    }
+
+    #[test]
+    fn multi_lemma_surface_toggles_new_lemma_flag() {
+        // One surface bearing two different lemmas exercises the
+        // new_lemma flag: reading 0 writes a lemma, a later reading flips
+        // the flag and re-reads. Readings are lemma-sorted, so the flag
+        // toggles 0 (same lemma) then 1 (new lemma).
+        let mut b = LexiconBuilder::new();
+        b.add("Leiter", "Leiter", UPOS::NOUN, Features::noun(Gender::Fem), Source::Attested)
+            .unwrap();
+        b.add("Leiter", "Leiter", UPOS::NOUN, Features::noun(Gender::Masc), Source::Attested)
+            .unwrap();
+        b.add("Leiter", "leiten", UPOS::VERB, Features::empty(), Source::Inflected)
+            .unwrap();
+        let mut fst = Vec::new();
+        let mut side = Vec::new();
+        let stats = b.finish(&mut fst, &mut side).unwrap();
+        assert_eq!(stats.num_lemmas, 2);
+        assert!(side[52] >= 1, "lemma_bits must be >=1 with two lemmas");
+
+        let lex = Lexicon::from_bytes(fst, side).unwrap();
+        let analyses = lex.analyze("Leiter");
+        assert_eq!(analyses.len(), 3);
+        let lemmas: std::collections::BTreeSet<&str> =
+            analyses.iter().map(|a| &*a.lemma).collect();
+        assert_eq!(
+            lemmas,
+            ["Leiter", "leiten"].into_iter().collect::<std::collections::BTreeSet<_>>()
+        );
+    }
+
+    #[test]
+    fn corrupt_width_header_is_rejected() {
+        // A stored width inconsistent with the table size must be caught
+        // at load rather than silently mis-decoding every record.
+        let mut b = LexiconBuilder::new();
+        b.add(
+            "Tisch",
+            "Tisch",
+            UPOS::NOUN,
+            Features::noun_form(Gender::Masc, Number::Sg, Case::Nom),
+            Source::Attested,
+        )
+        .unwrap();
+        b.add(
+            "Tische",
+            "Tisch",
+            UPOS::NOUN,
+            Features::noun_form(Gender::Masc, Number::Pl, Case::Nom),
+            Source::Attested,
+        )
+        .unwrap();
+        let mut fst = Vec::new();
+        let mut side = Vec::new();
+        b.finish(&mut fst, &mut side).unwrap();
+        side[52] = side[52].wrapping_add(1); // corrupt lemma_bits
+        assert!(matches!(
+            Lexicon::from_bytes(fst, side),
+            Err(crate::lexicon::load::LoadError::CorruptHeader { .. })
+        ));
     }
 }

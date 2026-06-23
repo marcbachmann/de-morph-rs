@@ -16,7 +16,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!(
             "{surface:>15} ({} hits)  e.g. lemma={:?} features={:?}",
             hits.len(),
-            hits.first().map(|h| h.lemma.as_str()),
+            hits.first().map(|h| &*h.lemma),
             hits.first().map(|h| h.features)
         );
     }

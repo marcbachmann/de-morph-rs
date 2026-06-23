@@ -1414,7 +1414,7 @@ mod tests {
         let lemmas: Vec<&str> = entries
             .iter()
             .filter(|(s, _)| s == "wessen")
-            .map(|(_, a)| a.lemma.as_str())
+            .map(|(_, a)| &*a.lemma)
             .collect();
         assert!(lemmas.contains(&"wer"), "missing wer for wessen");
         assert!(lemmas.contains(&"was"), "missing was for wessen");
@@ -1438,7 +1438,7 @@ mod tests {
         let mich_lemmas: Vec<&str> = entries
             .iter()
             .filter(|(s, _)| s == "mich")
-            .map(|(_, a)| a.lemma.as_str())
+            .map(|(_, a)| &*a.lemma)
             .collect();
         assert!(mich_lemmas.contains(&"ich"));
         assert!(mich_lemmas.contains(&"sich"));
