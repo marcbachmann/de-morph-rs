@@ -699,6 +699,10 @@ impl Lexicon {
             // this slice is always valid; `get` keeps the documented
             // graceful-degradation guarantee even against that.
             let shapes = self.set_shapes.get(from..to).unwrap_or(&[]);
+            // Reserve this group's shapes up front so the result Vec does
+            // not reallocate while pushing (the common single-group case
+            // then makes exactly one allocation of the right size).
+            out.reserve(shapes.len());
             for &shape_id in shapes {
                 let rec = AnalysisRecord { lemma_id, shape_id };
                 match self.materialise(&rec) {
