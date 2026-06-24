@@ -60,15 +60,21 @@ Wiktionary's standard template families by the `extract-*` binaries
 - `{{Deutsch Substantiv Übersicht}}` → `extract-nouns`
 - conjugation tables → `extract-verbs`
 - `{{Deutsch Adjektiv Übersicht}}` → `extract-adjectives`
+- `{{Pronomina-Tabelle}}` / `{{Deutsch Pronomen Übersicht}}` + indeclinable
+  indefinites → `extract-pronouns` (demonstratives, relatives, and the
+  open-ended indefinite/determiner gap: `allerlei` and the `-lei` family,
+  `derjenige`, `irgendein`, `jeglicher`, …)
 - adverbs / particles / abbreviations / proper nouns → respective bins
 - compound surfaces → `extract-compounds` (built for the runtime
   splitter; not baked into the FST)
 
-Closed-class words (personal pronouns, articles, prepositions,
-conjunctions, numerals, punctuation) are **not** extracted — they come
-from the hand-curated table in `src/paradigm/closed_class.rs`, because
-the personal-pronoun and possessive paradigms use parameterless
-meta-templates whose forms are absent from the page wikitext.
+The core closed class (personal pronouns, articles, prepositions,
+conjunctions, numerals, punctuation) comes from the hand-curated table in
+`src/paradigm/closed_class.rs`, because the personal-pronoun and possessive
+paradigms use parameterless meta-templates whose forms are absent from the
+page wikitext. `extract-pronouns` skips every lemma that table already
+covers, so the two sources never collide — extraction only *adds* the
+open-ended pronoun/determiner items the hand-curated set omits.
 
 Each output record carries a `source` tier (`Attested` / `Inflected` /
 `Composed` / `Predicted`) so downstream attribution and confidence are
@@ -85,9 +91,9 @@ The lexicon is deterministic given this snapshot:
 `scripts/build/lexicon.sh` reproduces `data/lexicon/lexicon.{fst,dat}`
 byte-for-byte and asserts the lossless analysis fingerprint:
 
-- surfaces: 711,680
+- surfaces: 711,763
 - analysis-dump sha256:
-  `d80b75cf99916483efa949d3e31789c7c01dc971b86ff66f7adc75d35c033e6d`
+  `387e7c6f3799774788af85c52bea7708d13fada7ce86fd5688985fe42f271be5`
 
 ## Files in this directory
 

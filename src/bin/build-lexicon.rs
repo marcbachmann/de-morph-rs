@@ -389,6 +389,7 @@ fn parse_args(argv: &[String]) -> Result<Args> {
         PathBuf::from("data/wiktionary/processed/particles.jsonl"),
         PathBuf::from("data/wiktionary/processed/abbreviations.jsonl"),
         PathBuf::from("data/wiktionary/processed/propn.jsonl"),
+        PathBuf::from("data/wiktionary/processed/pronouns.jsonl"),
     ];
     let mut fst_out = PathBuf::from("data/lexicon/lexicon.fst");
     let mut dat_out = PathBuf::from("data/lexicon/lexicon.dat");

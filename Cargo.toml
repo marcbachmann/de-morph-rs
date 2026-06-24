@@ -80,6 +80,11 @@ path = "src/bin/extract-propn.rs"
 required-features = ["extractor"]
 
 [[bin]]
+name = "extract-pronouns"
+path = "src/bin/extract-pronouns.rs"
+required-features = ["extractor"]
+
+[[bin]]
 name = "build-lexicon"
 path = "src/bin/build-lexicon.rs"
 required-features = ["extractor"]

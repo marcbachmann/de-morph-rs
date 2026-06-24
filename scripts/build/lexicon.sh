@@ -40,11 +40,11 @@ set -euo pipefail
 # --- configuration (pinned to the snapshot recorded in PROVENANCE) ----------
 DUMP_DATE="20260601"
 RAW_SHA256="daed03b88f52175c13c742876793894b73d0edf1d3eb946463256f23bb0906e5"
-EXPECTED_DUMP_SHA256="${EXPECTED_DUMP_SHA256-d80b75cf99916483efa949d3e31789c7c01dc971b86ff66f7adc75d35c033e6d}"
+EXPECTED_DUMP_SHA256="${EXPECTED_DUMP_SHA256-387e7c6f3799774788af85c52bea7708d13fada7ce86fd5688985fe42f271be5}"
 
-# Extractors to run. build-lexicon ingests the first 7; `compounds` is built
-# for completeness (runtime compound splitter) but not fed into the FST.
-EXTRACTORS=(nouns verbs adjectives adverbs particles abbreviations propn compounds)
+# Extractors to run. build-lexicon ingests all but `compounds`, which is built
+# for the runtime compound splitter and intentionally not baked into the FST.
+EXTRACTORS=(nouns verbs adjectives adverbs particles abbreviations propn pronouns compounds)
 
 # --- locate the repo root ---------------------------------------------------
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"

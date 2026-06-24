@@ -22,6 +22,7 @@ pub mod adverb;
 pub mod compound;
 pub mod dump;
 pub mod noun;
+pub mod pronoun;
 pub mod propn;
 pub mod template;
 pub mod verb;
