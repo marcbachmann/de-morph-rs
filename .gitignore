@@ -19,6 +19,10 @@ target/
 /data/lexicon/*.dat
 /data/lexicon/*.jsonl
 
+# Packaged CC BY-SA data bundles (scripts/build/package-data.sh output).
+# Regenerable from the snapshot; shipped as release assets, not committed.
+/dist/
+
 # Editor / OS noise
 .idea/
 .vscode/

@@ -11,7 +11,21 @@
   `daed03b88f52175c13c742876793894b73d0edf1d3eb946463256f23bb0906e5`
 - Raw artefact size: 265,133,447 bytes (~252 MiB compressed)
 
-## Licence
+## Structured record
+
+    id              = "dewiktionary-20260601"
+    kind            = "data"
+    name            = "German Wiktionary (dump)"
+    url             = "https://dumps.wikimedia.org/dewiktionary/20260601/dewiktionary-20260601-pages-articles.xml.bz2"
+    version         = "20260601"
+    fetch_date      = "2026-06-16"
+    license_spdx    = "CC-BY-SA-4.0"
+    license_file    = "LICENSES/CC-BY-SA-4.0.txt"
+    attribution     = "Wiktionary contributors"
+    attribution_url = "https://de.wiktionary.org/"
+    sha256          = "daed03b88f52175c13c742876793894b73d0edf1d3eb946463256f23bb0906e5"
+
+## Licence and usage tiers
 
 - Text content: **CC BY-SA 4.0**
   (<https://creativecommons.org/licenses/by-sa/4.0/>; verbatim text at
@@ -21,42 +35,65 @@
   per Wikimedia Foundation Terms of Use, section 7.
 - Required attribution: "Wiktionary contributors" with a link back to
   the article (or article history) on `de.wiktionary.org` (Wikimedia
-  Foundation Terms of Use, section 7).
-- Implication for this project: any artefact derived from this
-  snapshot — the processed lexicon, the FST data file, any compiled
-  morphological table — inherits CC BY-SA 4.0 and is shipped as a
-  separately-licensed file rather than as part of the MIT-licensed
-  Rust source.
+  Foundation Terms of Use, section 7). Recorded authoritatively in the
+  root `NOTICE`.
 
-## Extraction scope
+Usage tiers (see `data/README.md`):
 
-Planned (not yet implemented): extraction of `(lemma, pos,
-inflection-table)` triples from German Wiktionary's standard
-template families:
+- **raw dump** (`raw/…xml.bz2`) — `build-only`. Gitignored; consumed at
+  build time only; never shipped.
+- **derived lexicon** (`data/lexicon/lexicon.{fst,dat}`) — `ship`. A
+  derivative of the snapshot, so it inherits CC BY-SA 4.0. It is **not**
+  part of the MIT cargo crate (`data/*` is excluded in `Cargo.toml`); it
+  is distributed separately, bundled with its licence and attribution by
+  `scripts/build/package-data.sh`. The MIT-licensed Rust source contains
+  no Wiktionary-derived text.
+- intermediate `processed/*.jsonl` — `build-only` (regenerable;
+  gitignored). Same CC BY-SA status as the lexicon if ever shipped.
 
-- `{{Deutsch Substantiv Übersicht}}` and related noun tables
-- `{{Deutsch Verb Übersicht}}` and conjugation pages
-- `{{Deutsch Adjektiv Übersicht}}` for adjective declension
-- Closed-class tables for pronouns, determiners, prepositions
+## Extraction scope (implemented)
 
-The extraction proceeds at three levels of trust:
+`(lemma, pos, features, source)` records are extracted from German
+Wiktionary's standard template families by the `extract-*` binaries
+(`src/bin/`, feature `extractor`):
 
-1. **Strict** — only entries with a complete, well-formed template.
-2. **Permissive** — entries with partial templates, completed by
-   paradigm inference (rules expressed in the in-repo DSL).
-3. **Heuristic** — entries with no template but with section-level
-   POS information; output flagged as low-confidence.
+- `{{Deutsch Substantiv Übersicht}}` → `extract-nouns`
+- conjugation tables → `extract-verbs`
+- `{{Deutsch Adjektiv Übersicht}}` → `extract-adjectives`
+- adverbs / particles / abbreviations / proper nouns → respective bins
+- compound surfaces → `extract-compounds` (built for the runtime
+  splitter; not baked into the FST)
 
-Each output entry carries a provenance pointer back to its source
-Wiktionary article and revision so that downstream attribution is
-mechanically possible.
+Closed-class words (personal pronouns, articles, prepositions,
+conjunctions, numerals, punctuation) are **not** extracted — they come
+from the hand-curated table in `src/paradigm/closed_class.rs`, because
+the personal-pronoun and possessive paradigms use parameterless
+meta-templates whose forms are absent from the page wikitext.
+
+Each output record carries a `source` tier (`Attested` / `Inflected` /
+`Composed` / `Predicted`) so downstream attribution and confidence are
+mechanically available.
+
+## Build and reproducibility
+
+The lexicon is deterministic given this snapshot:
+
+    bash scripts/fetch/dewiktionary.sh     # fetch + verify (sha256 above)
+    bash scripts/build/lexicon.sh          # extract → build → verify
+    bash scripts/build/package-data.sh     # CC BY-SA bundle for shipping
+
+`scripts/build/lexicon.sh` reproduces `data/lexicon/lexicon.{fst,dat}`
+byte-for-byte and asserts the lossless analysis fingerprint:
+
+- surfaces: 711,680
+- analysis-dump sha256:
+  `d80b75cf99916483efa949d3e31789c7c01dc971b86ff66f7adc75d35c033e6d`
 
 ## Files in this directory
 
 - `raw/dewiktionary-20260601-pages-articles.xml.bz2` — gitignored
-  snapshot from the dump (see `.gitignore`).
-- `processed/` — versioned, attributed processed outputs (none yet;
-  the extractor has not been written).
+  snapshot (see `.gitignore`).
+- `processed/*.jsonl` — gitignored, regenerable extractor outputs.
 
 ## How to refresh
 
@@ -68,6 +105,5 @@ different snapshot:
 
     DUMP_DATE=20260620 bash scripts/fetch/dewiktionary.sh
 
-The processing pipeline (separate target, not yet implemented) reads
-`raw/`, produces `processed/`, and updates this file with the new
-snapshot date and hash.
+Then re-run `scripts/build/lexicon.sh`; if the snapshot changed, update
+the hashes above (raw sha256 and the lossless fingerprint).

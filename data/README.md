@@ -28,7 +28,10 @@ Each source declares a `usage` tier in its `PROVENANCE.md`:
 
 ## Current sources
 
-(none yet)
+- **German Wiktionary** (`data/wiktionary/`) — CC BY-SA 4.0. Raw dump
+  is `build-only`; the derived lexicon (`data/lexicon/`) is `ship`-tier
+  and distributed separately under CC BY-SA, never in the MIT crate.
+  See `data/wiktionary/PROVENANCE.md` and the root `NOTICE`.
 
 ## Adding a source
 

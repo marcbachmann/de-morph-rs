@@ -13,4 +13,7 @@ project root, not this directory.
 
 Files in this directory at v0.0.1:
 
-(none yet — license texts land alongside the first third-party source)
+- `CC-BY-SA-4.0.txt` — Creative Commons Attribution-ShareAlike 4.0
+  International. Applies to the German Wiktionary snapshot and every
+  artefact derived from it (the built lexicon). See the root `NOTICE`
+  and `data/wiktionary/PROVENANCE.md`.
