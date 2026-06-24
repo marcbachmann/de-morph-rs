@@ -16,9 +16,9 @@
 #   1. verify the raw dump sha256 against PROVENANCE
 #   2. cargo build --release --features extractor (extractors + build-lexicon
 #      + the dump_analyses verification harness)
-#   3. run the 8 extract-* binaries  -> data/wiktionary/processed/*.jsonl
-#   4. run build-lexicon (7 ingested inputs; compounds.jsonl is produced for
-#      the runtime splitter but intentionally not baked into the FST)
+#   3. run the extract-* binaries  -> data/wiktionary/processed/*.jsonl
+#   4. run build-lexicon (ingests all inputs except compounds.jsonl, which is
+#      produced for the runtime splitter but intentionally not baked in)
 #   5. dump every analysis and verify the lossless fingerprint is unchanged
 #
 # The build is deterministic: given this snapshot, steps 3-4 reproduce
@@ -40,7 +40,7 @@ set -euo pipefail
 # --- configuration (pinned to the snapshot recorded in PROVENANCE) ----------
 DUMP_DATE="20260601"
 RAW_SHA256="daed03b88f52175c13c742876793894b73d0edf1d3eb946463256f23bb0906e5"
-EXPECTED_DUMP_SHA256="${EXPECTED_DUMP_SHA256-387e7c6f3799774788af85c52bea7708d13fada7ce86fd5688985fe42f271be5}"
+EXPECTED_DUMP_SHA256="${EXPECTED_DUMP_SHA256-268247e02f36ec28027080076089e25d289c02f2a356757917258f5db09f4dc5}"
 
 # Extractors to run. build-lexicon ingests all but `compounds`, which is built
 # for the runtime compound splitter and intentionally not baked into the FST.

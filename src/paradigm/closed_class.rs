@@ -711,8 +711,8 @@ fn add_numerals(out: &mut Vec<ClosedClassEntry>) {
 // Ordinal numerals (erster, zweiter, dritter, ...)
 // ---------------------------------------------------------------------------
 
-/// Ordinal lemmas (Nom Sg Weak masc form, used as the citation form in
-/// Wiktionary). Each ordinal declines like a regular adjective; we
+/// Ordinal lemmas (Nom Sg Weak masc form, used as the citation form in Wiktionary).
+/// Each ordinal declines like a regular adjective; we
 /// reuse the adjective paradigm generator and retag the output as
 /// `UPOS::NUM`.
 const ORDINAL_LEMMAS: &[&str] = &[
@@ -795,22 +795,18 @@ fn add_compound_cardinals(out: &mut Vec<ClosedClassEntry>) {
             ));
         }
     }
-    // 200-900: <ones>hundert, e.g. zweihundert, dreihundert, ..., neunhundert.
+    // 100-900: <ones>hundert, e.g. einhundert, zweihundert, ..., neunhundert.
+    // `einhundert` is included alongside the bare `hundert` (CARDINAL_NUMERALS)
+    // — both are standard German; `einhundert` is the explicit/formal form.
     for &one in ONES_COMPOUND_STEMS {
-        if one == "ein" {
-            continue; // "einhundert" is sometimes used but the canonical 100 is just "hundert"
-        }
         let surface = format!("{one}hundert");
         out.push((
             surface.clone(),
             Analysis::with_source(&surface, UPOS::NUM, Features::empty(), Source::Attested),
         ));
     }
-    // 2000-9000: <ones>tausend.
+    // 1000-9000: <ones>tausend, e.g. eintausend, zweitausend, ..., neuntausend.
     for &one in ONES_COMPOUND_STEMS {
-        if one == "ein" {
-            continue;
-        }
         let surface = format!("{one}tausend");
         out.push((
             surface.clone(),

@@ -91,9 +91,9 @@ The lexicon is deterministic given this snapshot:
 `scripts/build/lexicon.sh` reproduces `data/lexicon/lexicon.{fst,dat}`
 byte-for-byte and asserts the lossless analysis fingerprint:
 
-- surfaces: 711,763
+- surfaces: 711,765
 - analysis-dump sha256:
-  `387e7c6f3799774788af85c52bea7708d13fada7ce86fd5688985fe42f271be5`
+  `268247e02f36ec28027080076089e25d289c02f2a356757917258f5db09f4dc5`
 
 ## Files in this directory
 

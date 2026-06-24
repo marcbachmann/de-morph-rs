@@ -28,7 +28,7 @@ set -euo pipefail
 DUMP_DATE="20260601"
 DUMP_URL="https://dumps.wikimedia.org/dewiktionary/${DUMP_DATE}/dewiktionary-${DUMP_DATE}-pages-articles.xml.bz2"
 RAW_SHA256="daed03b88f52175c13c742876793894b73d0edf1d3eb946463256f23bb0906e5"
-EXPECTED_DUMP_SHA256="387e7c6f3799774788af85c52bea7708d13fada7ce86fd5688985fe42f271be5"
+EXPECTED_DUMP_SHA256="268247e02f36ec28027080076089e25d289c02f2a356757917258f5db09f4dc5"
 FORMAT_VERSION="7"   # src/lexicon/format.rs VERSION_MAJOR
 
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
