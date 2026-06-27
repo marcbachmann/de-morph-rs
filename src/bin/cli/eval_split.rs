@@ -19,8 +19,6 @@ use std::time::Instant;
 
 use de_morph::{Lexicon, UPOS};
 
-const FST: &str = "data/lexicon/lexicon.fst";
-const DAT: &str = "data/lexicon/lexicon.dat";
 const COMPOUNDS: &str = "data/wiktionary/processed/compounds.jsonl";
 
 #[derive(Default, Debug)]
@@ -233,15 +231,16 @@ fn pull_optional_string(line: &str, key: &str) -> Option<String> {
     Some(after_quote[..end].to_string())
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let lex = Lexicon::open(FST, DAT)?;
+pub fn run(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
+    let compounds_path = args.first().map(String::as_str).unwrap_or(COMPOUNDS);
+    let lex = crate::loader::lexicon()?;
     eprintln!(
         "Lexicon: {} lemmas, {} surfaces",
         lex.num_lemmas(),
         lex.num_surfaces()
     );
-    eprintln!("Reading {COMPOUNDS}");
-    let file = File::open(COMPOUNDS)?;
+    eprintln!("Reading {compounds_path}");
+    let file = File::open(compounds_path)?;
     let reader = BufReader::new(file);
 
     let t = Instant::now();

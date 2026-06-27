@@ -6,8 +6,7 @@
 //! (lemma + POS) accuracy, broken down by POS.
 //!
 //! Run with:
-//!   cargo run --release --example conllu_eval -- <conllu-dir> [N]
-//! where N (optional) limits the number of files.
+//!   de-morph eval <path>...   (path = .conllu file OR directory)
 
 use std::collections::HashMap;
 use std::fs::File;
@@ -16,10 +15,7 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use de_morph::analysis::UPOS;
-use de_morph::{Analyzer, Lexicon};
-
-const FST_PATH: &str = "data/lexicon/lexicon.fst";
-const DAT_PATH: &str = "data/lexicon/lexicon.dat";
+use de_morph::Analyzer;
 
 #[derive(Default, Debug, Clone, Copy)]
 struct Counts {
@@ -33,20 +29,18 @@ struct Counts {
     top1_pos_match: u64,
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let argv: Vec<String> = std::env::args().collect();
-    if argv.len() < 2 {
-        return Err("usage: conllu_eval <path>...  (path = .conllu file OR directory)".into());
+pub fn run(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
+    if args.is_empty() {
+        return Err("usage: de-morph eval <path>...  (path = .conllu file OR directory)".into());
     }
 
     eprintln!("Loading lexicon...");
     let t0 = Instant::now();
-    let lex = Lexicon::open(FST_PATH, DAT_PATH)?;
     // Enable Swiss-orthography for eval — out-udpipe is heavy on
     // Swiss/Austrian text, and the UD treebanks mix both. The flag is
     // off in the library default; eval is the right place to opt in
     // so we measure the bridge's contribution rather than excluding it.
-    let analyzer = Analyzer::from_lexicon(lex).with_swiss_orthography(true);
+    let analyzer = crate::loader::analyzer()?.with_swiss_orthography(true);
     eprintln!("  loaded in {:.2}s", t0.elapsed().as_secs_f64());
 
     // Expand any input path: a .conllu file is taken as-is, a
@@ -54,7 +48,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // input path becomes its own labelled corpus in the per-corpus
     // breakdown.
     let mut corpora: Vec<(String, Vec<PathBuf>)> = Vec::new();
-    for arg in &argv[1..] {
+    for arg in args {
         let path = Path::new(arg);
         if !path.exists() {
             return Err(format!("path does not exist: {arg}").into());

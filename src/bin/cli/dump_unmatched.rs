@@ -2,7 +2,7 @@
 //! analyses do NOT include the gold lemma+pos pair, sorted by frequency.
 //!
 //! Usage:
-//!   cargo run --release --example conllu_unmatched_dump -- <corpus_dir>...
+//!   de-morph dump-unmatched <corpus_dir>...
 //!
 //! Output:
 //!   `data/lexicon/unmatched.jsonl` — one record per (surface, gold_lemma,
@@ -32,8 +32,6 @@ use std::time::Instant;
 
 use de_morph::Analyzer;
 
-const FST: &str = "data/lexicon/lexicon.fst";
-const DAT: &str = "data/lexicon/lexicon.dat";
 const OUTPUT: &str = "data/lexicon/unmatched.jsonl";
 
 #[derive(Default)]
@@ -43,14 +41,13 @@ struct MissRecord {
     pos_matched_somewhere: bool,
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let argv: Vec<String> = std::env::args().collect();
-    if argv.len() < 2 {
-        eprintln!("usage: conllu_unmatched_dump <path>...  (path = .conllu file OR directory)");
+pub fn run(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
+    if args.is_empty() {
+        eprintln!("usage: de-morph dump-unmatched <path>...  (path = .conllu file OR directory)");
         std::process::exit(2);
     }
     eprintln!("Loading lexicon...");
-    let analyzer = Analyzer::open(FST, DAT)?.with_swiss_orthography(true);
+    let analyzer = crate::loader::analyzer()?.with_swiss_orthography(true);
     eprintln!("  loaded in 0.01s");
 
     let mut misses: HashMap<(String, String, String), MissRecord> = HashMap::new();
@@ -58,7 +55,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut tok_total: u64 = 0;
     let mut tok_miss: u64 = 0;
 
-    for arg in argv.iter().skip(1) {
+    for arg in args {
         let p = PathBuf::from(arg);
         if p.is_dir() {
             for entry in fs::read_dir(&p)? {

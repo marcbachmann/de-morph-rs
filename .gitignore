@@ -23,6 +23,9 @@ target/
 # Regenerable from the snapshot; shipped as release assets, not committed.
 /dist/
 
+# Exclude claude files
+/docs/
+
 # Editor / OS noise
 .idea/
 .vscode/

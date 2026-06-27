@@ -1,45 +1,28 @@
-//! Demonstrate the runtime analyzer on the built lexicon.
-//!
-//! The lexicon is embedded via `include_bytes!`, so `data/lexicon/lexicon.
-//! {fst,dat}` must exist **at compile time**; build it first with
-//! `cargo run --release --features extractor --bin build-lexicon`. Loading
-//! is then zero-copy (see `LEXICON_FST`/`LEXICON_DAT` below).
+//! `de-morph analyze` — run the runtime analyzer on words / sentences / stdin.
 //!
 //! Usage:
 //!
 //!   # Built-in curated showcase (nouns, verbs, adjectives, OOV):
-//!   cargo run --release --example analyze_demo
+//!   de-morph analyze
 //!
 //!   # Analyze each word of a sentence passed as an argument:
-//!   cargo run --release --example analyze_demo -- "Ich gehe heute zur Schule."
+//!   de-morph analyze "Ich gehe heute zur Schule."
 //!
 //!   # Pipe input — each line is treated as one sentence:
-//!   echo "Ich gehe heute zur Schule." | cargo run --release --example analyze_demo
-//!   cat sentences.txt | cargo run --release --example analyze_demo
+//!   echo "Ich gehe heute zur Schule." | de-morph analyze
+//!   cat sentences.txt | de-morph analyze
 //!
 //!   # Force stdin read with the `-` argument (overrides showcase even
 //!   # when stdin is a TTY):
-//!   cargo run --release --example analyze_demo -- -
+//!   de-morph analyze -
 //!
 //!   # Enable the Swiss ss→ß orthography bridge (works with any input mode):
-//!   cargo run --release --example analyze_demo -- --swiss "Das ist die Strasse durch Zürich."
+//!   de-morph analyze --swiss "Das ist die Strasse durch Zürich."
 
 use std::io::{self, BufRead, IsTerminal};
 use std::time::Instant;
 
-use de_morph::{Analysis, Analyzer, Lexicon, Source};
-
-/// The lexicon, embedded into the binary at compile time. `include_bytes!`
-/// places these in the executable's read-only data, so at runtime they are
-/// `&'static [u8]` — demand-paged from the binary image, never read into the
-/// process heap. Paired with [`Lexicon::from_static`], lemma lookups borrow
-/// straight out of these bytes (zero-copy), so no per-analysis allocation and
-/// no resident copy of the ~8 MiB dictionary.
-///
-/// Requires `data/lexicon/lexicon.{fst,dat}` to exist *at compile time* — see
-/// the module docs for how to build them.
-static LEXICON_FST: &[u8] = include_bytes!("../data/lexicon/lexicon.fst");
-static LEXICON_DAT: &[u8] = include_bytes!("../data/lexicon/lexicon.dat");
+use de_morph::{Analysis, Analyzer, Source};
 
 const SAMPLES: &[&str] = &[
     // Noun forms
@@ -80,7 +63,7 @@ enum Mode {
     Stdin,
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+pub fn run(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
     // Parse CLI: optional --swiss flag plus optional positional
     // sentence (the rest of argv joined with spaces) or a literal `-`
     // to force stdin reads.
@@ -88,13 +71,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut oov = true;
     let mut force_stdin = false;
     let mut positional: Vec<String> = Vec::new();
-    for arg in std::env::args().skip(1) {
+    for arg in args {
         match arg.as_str() {
             "--swiss" => swiss = true,
             "--no-oov" => oov = false,
             "-" => force_stdin = true,
             "--help" | "-h" => {
-                eprintln!("usage: analyze_demo [--swiss] [--no-oov] [SENTENCE | -]");
+                eprintln!("usage: de-morph analyze [--swiss] [--no-oov] [SENTENCE | -]");
                 eprintln!("  (none)        → curated showcase");
                 eprintln!("  SENTENCE      → tokenise on whitespace, analyse each word");
                 eprintln!("  -             → force read from stdin (one sentence per line)");
@@ -103,7 +86,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 eprintln!("  --no-oov      → disable out-of-vocabulary guessing (drops Predicted results)");
                 std::process::exit(0);
             }
-            _ => positional.push(arg),
+            _ => positional.push(arg.clone()),
         }
     }
 
@@ -117,7 +100,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     eprintln!("Loading embedded lexicon (zero-copy)...");
     let load_start = Instant::now();
-    let mut analyzer = Analyzer::from_lexicon(Lexicon::from_static(LEXICON_FST, LEXICON_DAT)?);
+    let mut analyzer = crate::loader::analyzer()?;
     if swiss {
         analyzer = analyzer.with_swiss_orthography(true);
     }

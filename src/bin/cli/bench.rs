@@ -1,11 +1,11 @@
-//! Throughput + memory benchmark for the runtime analyzer.
+//! `de-morph bench` — throughput + memory benchmark for the runtime analyzer.
 //!
 //! Loads the embedded lexicon (zero-copy `from_static`), collects every
 //! surface form, then times `Lexicon::analyze` over all of them across
 //! several passes. Run under `/usr/bin/time -l` to capture max RSS:
 //!
-//!   cargo build --release --example bench_analyze
-//!   /usr/bin/time -l ./target/release/examples/bench_analyze 5
+//!   cargo build --release --bin de-morph
+//!   /usr/bin/time -l ./target/release/de-morph bench 5
 //!
 //! Modes (arg 1):
 //!   sweep [passes]   throughput over every surface (default, passes=5)
@@ -18,11 +18,10 @@ use std::time::Instant;
 use de_morph::Lexicon;
 use fst::{Map as FstMap, Streamer};
 
-static LEXICON_FST: &[u8] = include_bytes!("../data/lexicon/lexicon.fst");
-static LEXICON_DAT: &[u8] = include_bytes!("../data/lexicon/lexicon.dat");
+use crate::loader::{LEXICON_DAT, LEXICON_FST};
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mode = std::env::args().nth(1).unwrap_or_else(|| "sweep".into());
+pub fn run(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
+    let mode = args.first().cloned().unwrap_or_else(|| "sweep".into());
 
     // Load-only modes isolate the lexicon's resident footprint (no word
     // list, no analysis churn) — `from_static` leaves the side table
@@ -44,10 +43,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    let passes: u32 = std::env::args()
-        .nth(2)
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(5);
+    let passes: u32 = args.get(1).and_then(|s| s.parse().ok()).unwrap_or(5);
 
     let t_load = Instant::now();
     let lex = Lexicon::from_static(LEXICON_FST, LEXICON_DAT)?;

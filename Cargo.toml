@@ -89,9 +89,9 @@ name = "build-lexicon"
 path = "src/bin/build-lexicon.rs"
 required-features = ["extractor"]
 
-# build_fst.rs is a build-time tool: reads JSONL output from extract-nouns
-# (gated by the same feature) and uses anyhow::Context for I/O context.
-# Demo examples that only use Lexicon/Analyzer at runtime don't need this gate.
-[[example]]
-name = "build_fst"
-required-features = ["extractor"]
+# Runtime CLI: analyze / split / bench / dump + the eval & diagnostic
+# subcommands. Embeds the lexicon via include_bytes! and only touches
+# Lexicon/Analyzer at runtime, so it needs no feature gate.
+[[bin]]
+name = "de-morph"
+path = "src/bin/de-morph.rs"

@@ -1,11 +1,10 @@
-//! Demonstrate the compound splitter on the live lexicon.
+//! `de-morph split` — show ranked compound splittings.
 //!
-//! Requires `data/lexicon/lexicon.{fst,dat}`. Run:
-//!   `cargo run --release --features extractor --example compound_demo`
+//! With no arguments, runs a built-in sample set; otherwise splits each
+//! word passed on the command line:
+//!   de-morph split Lehrerzimmer Donaudampfschiff
 
-use de_morph::Lexicon;
-
-const COMPOUNDS: &[&str] = &[
+const SAMPLES: &[&str] = &[
     "Lehrerzimmer",
     "Buchhandlung",
     "Wassermelone",
@@ -16,16 +15,22 @@ const COMPOUNDS: &[&str] = &[
     "Donaudampfschiff", // expects 3 parts: Donau + Dampf + Schiff
 ];
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+pub fn run(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
     eprintln!("Loading lexicon...");
-    let lex = Lexicon::open("data/lexicon/lexicon.fst", "data/lexicon/lexicon.dat")?;
+    let lex = crate::loader::lexicon()?;
     eprintln!(
         "  {} surfaces, {} lemmas\n",
         lex.num_surfaces(),
         lex.num_lemmas()
     );
 
-    for compound in COMPOUNDS {
+    let words: Vec<&str> = if args.is_empty() {
+        SAMPLES.to_vec()
+    } else {
+        args.iter().map(String::as_str).collect()
+    };
+
+    for compound in words {
         println!("=== {compound} ===");
         let ranked = lex.split_compound_ranked(compound);
         if ranked.is_empty() {
