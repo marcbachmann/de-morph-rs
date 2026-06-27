@@ -39,6 +39,13 @@ mod eval_split;
 #[path = "cli/split.rs"]
 mod split;
 
+#[cfg(feature = "extractor")]
+#[path = "cli/extract.rs"]
+mod extract;
+#[cfg(feature = "extractor")]
+#[path = "cli/build_lexicon.rs"]
+mod build_lexicon;
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let cmd = args.get(1).map(String::as_str);
@@ -52,6 +59,18 @@ fn main() {
         Some("eval") => eval::run(&rest),
         Some("eval-split") => eval_split::run(&rest),
         Some("dump-unmatched") => dump_unmatched::run(&rest),
+        #[cfg(feature = "extractor")]
+        Some("extract") => extract::run(&rest).map_err(|e| format!("{e:#}").into()),
+        #[cfg(feature = "extractor")]
+        Some("build-lexicon") => build_lexicon::run(&rest).map_err(|e| format!("{e:#}").into()),
+        #[cfg(not(feature = "extractor"))]
+        Some(c @ ("extract" | "build-lexicon")) => {
+            eprintln!(
+                "de-morph: '{c}' requires the 'extractor' feature. Rebuild with:\n  \
+                 cargo build --release --features extractor --bin de-morph"
+            );
+            std::process::exit(2);
+        }
         Some("-h") | Some("--help") | Some("help") | None => {
             print_help();
             return;
@@ -102,6 +121,16 @@ COMMANDS:
 
     dump-unmatched <path>...
             Dump unmatched (surface, gold_lemma, gold_pos) triples to
-            data/lexicon/unmatched.jsonl, sorted by frequency."
+            data/lexicon/unmatched.jsonl, sorted by frequency.
+
+  Lexicon build (requires --features extractor):
+
+    extract <kind> [--input PATH] [--output PATH] [--limit N]
+            Extract analyses from a Wiktionary dump to JSONL. Kinds: nouns
+            verbs adjectives adverbs particles abbreviations propn pronouns
+            compounds.
+
+    build-lexicon [--input PATH]... [--fst-out PATH] [--dat-out PATH]
+            Build the runtime FST + side table from the extracted JSONL."
     );
 }

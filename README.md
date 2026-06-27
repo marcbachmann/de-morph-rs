@@ -66,9 +66,18 @@ The published crate bundles no data (`data/` is excluded from the
 package — see `exclude` in `Cargo.toml`). With no lexicon loaded the
 analyzer still returns best-effort out-of-vocabulary guesses; for real
 coverage, build a lexicon and open it with `Analyzer::open`. The
-build-lexicon tooling writes a Wiktionary-derived lexicon to
-`data/lexicon/` (generated; gitignored) for local development and
-evaluation.
+`de-morph build-lexicon` subcommand (built with `--features extractor`)
+writes a Wiktionary-derived lexicon to `data/lexicon/` (generated;
+gitignored) for local development and evaluation. The full reproducible
+pipeline — extract every POS then build — is `scripts/build/lexicon.sh`.
+
+## CLI
+
+A single `de-morph` binary. Runtime subcommands (`analyze`, `split`,
+`bench`, `dump`, `eval`, `eval-split`, `dump-unmatched`) embed the
+lexicon and need no extra features. The lexicon-build subcommands
+(`extract <kind>`, `build-lexicon`) require `--features extractor`. Run
+`de-morph --help` for the full list.
 
 ## Contributing
 

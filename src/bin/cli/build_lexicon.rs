@@ -59,9 +59,8 @@ struct Counters {
     by_source: HashMap<&'static str, u64>,
 }
 
-fn main() -> Result<()> {
-    let argv: Vec<String> = std::env::args().collect();
-    let args = parse_args(&argv)?;
+pub fn run(args_in: &[String]) -> Result<()> {
+    let args = parse_args(args_in)?;
 
     let start = Instant::now();
     let mut builder = LexiconBuilder::new();
@@ -401,7 +400,7 @@ struct Args {
     dat_out: PathBuf,
 }
 
-fn parse_args(argv: &[String]) -> Result<Args> {
+fn parse_args(args: &[String]) -> Result<Args> {
     let mut inputs: Vec<PathBuf> = vec![
         PathBuf::from("data/wiktionary/processed/nouns.jsonl"),
         PathBuf::from("data/wiktionary/processed/verbs.jsonl"),
@@ -416,12 +415,12 @@ fn parse_args(argv: &[String]) -> Result<Args> {
     let mut dat_out = PathBuf::from("data/lexicon/lexicon.dat");
     let mut explicit_inputs = false;
 
-    let mut i = 1;
-    while i < argv.len() {
-        match argv[i].as_str() {
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
             "--input" => {
                 i += 1;
-                let p = argv.get(i).context("--input requires a value")?;
+                let p = args.get(i).context("--input requires a value")?;
                 if !explicit_inputs {
                     inputs.clear();
                     explicit_inputs = true;
@@ -430,11 +429,11 @@ fn parse_args(argv: &[String]) -> Result<Args> {
             }
             "--fst-out" => {
                 i += 1;
-                fst_out = PathBuf::from(argv.get(i).context("--fst-out requires a value")?);
+                fst_out = PathBuf::from(args.get(i).context("--fst-out requires a value")?);
             }
             "--dat-out" => {
                 i += 1;
-                dat_out = PathBuf::from(argv.get(i).context("--dat-out requires a value")?);
+                dat_out = PathBuf::from(args.get(i).context("--dat-out requires a value")?);
             }
             "--help" | "-h" => {
                 print_usage();
@@ -457,10 +456,10 @@ fn parse_args(argv: &[String]) -> Result<Args> {
 
 fn print_usage() {
     eprintln!(
-        "build-lexicon — build the runtime FST + side table from JSONL inputs\n\
+        "de-morph build-lexicon — build the runtime FST + side table from JSONL inputs\n\
 \n\
 Usage:\n\
-  cargo run --release --features extractor --bin build-lexicon -- [options]\n\
+  de-morph build-lexicon [options]   (requires --features extractor)\n\
 \n\
 Options:\n\
   --input <PATH>      Add an input JSONL file (default: nouns.jsonl + verbs.jsonl).\n\

@@ -10,8 +10,8 @@ use de_morph::{Analyzer, Lexicon};
 /// The lexicon FST + side table, embedded into the binary at compile time.
 /// `include_bytes!` places these in read-only data, so at runtime they are
 /// `&'static [u8]` paired with [`Lexicon::from_static`] for zero-copy lookup.
-pub static LEXICON_FST: &[u8] = include_bytes!("../../../data/lexicon/lexicon.fst");
-pub static LEXICON_DAT: &[u8] = include_bytes!("../../../data/lexicon/lexicon.dat");
+pub static LEXICON_FST: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/lexicon.fst"));
+pub static LEXICON_DAT: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/lexicon.dat"));
 
 /// Open the embedded lexicon (zero-copy).
 pub fn lexicon() -> Result<Lexicon, Box<dyn std::error::Error>> {

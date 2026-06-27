@@ -39,59 +39,11 @@ quick-xml = { version = "0.36", optional = true }
 serde = { version = "1", features = ["derive"], optional = true }
 serde_json = { version = "1", optional = true }
 
-[[bin]]
-name = "extract-nouns"
-path = "src/bin/extract-nouns.rs"
-required-features = ["extractor"]
-
-[[bin]]
-name = "extract-verbs"
-path = "src/bin/extract-verbs.rs"
-required-features = ["extractor"]
-
-[[bin]]
-name = "extract-adjectives"
-path = "src/bin/extract-adjectives.rs"
-required-features = ["extractor"]
-
-[[bin]]
-name = "extract-adverbs"
-path = "src/bin/extract-adverbs.rs"
-required-features = ["extractor"]
-
-[[bin]]
-name = "extract-particles"
-path = "src/bin/extract-particles.rs"
-required-features = ["extractor"]
-
-[[bin]]
-name = "extract-compounds"
-path = "src/bin/extract-compounds.rs"
-required-features = ["extractor"]
-
-[[bin]]
-name = "extract-abbreviations"
-path = "src/bin/extract-abbreviations.rs"
-required-features = ["extractor"]
-
-[[bin]]
-name = "extract-propn"
-path = "src/bin/extract-propn.rs"
-required-features = ["extractor"]
-
-[[bin]]
-name = "extract-pronouns"
-path = "src/bin/extract-pronouns.rs"
-required-features = ["extractor"]
-
-[[bin]]
-name = "build-lexicon"
-path = "src/bin/build-lexicon.rs"
-required-features = ["extractor"]
-
-# Runtime CLI: analyze / split / bench / dump + the eval & diagnostic
-# subcommands. Embeds the lexicon via include_bytes! and only touches
-# Lexicon/Analyzer at runtime, so it needs no feature gate.
+# The single `de-morph` binary. Runtime subcommands (analyze / split /
+# bench / dump + eval diagnostics) embed the lexicon via include_bytes!
+# and need no extra deps. The lexicon-build subcommands (extract /
+# build-lexicon) are compiled in only under `--features extractor`, which
+# pulls the bz2/XML/serde tooling.
 [[bin]]
 name = "de-morph"
 path = "src/bin/de-morph.rs"

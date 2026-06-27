@@ -12,13 +12,13 @@
 #            attribution. The Rust source stays MIT; only this data layer is
 #            copyleft.
 #
-# Pipeline (matches src/bin/build-lexicon.rs defaults exactly):
+# Pipeline (matches `de-morph build-lexicon` defaults exactly):
 #   1. verify the raw dump sha256 against PROVENANCE
-#   2. cargo build --release --features extractor (extractors + build-lexicon
-#      + the dump_analyses verification harness)
-#   3. run the extract-* binaries  -> data/wiktionary/processed/*.jsonl
-#   4. run build-lexicon (ingests all inputs except compounds.jsonl, which is
-#      produced for the runtime splitter but intentionally not baked in)
+#   2. cargo build --release --features extractor --bin de-morph
+#      (one binary: runtime + `extract` / `build-lexicon` / `dump` subcommands)
+#   3. run `de-morph extract <kind>`  -> data/wiktionary/processed/*.jsonl
+#   4. run `de-morph build-lexicon` (ingests all inputs except compounds.jsonl,
+#      which is produced for the runtime splitter but intentionally not baked in)
 #   5. dump every analysis and verify the lossless fingerprint is unchanged
 #
 # The build is deterministic: given this snapshot, steps 3-4 reproduce
@@ -40,9 +40,9 @@ set -euo pipefail
 # --- configuration (pinned to the snapshot recorded in PROVENANCE) ----------
 DUMP_DATE="20260601"
 RAW_SHA256="daed03b88f52175c13c742876793894b73d0edf1d3eb946463256f23bb0906e5"
-EXPECTED_DUMP_SHA256="${EXPECTED_DUMP_SHA256-268247e02f36ec28027080076089e25d289c02f2a356757917258f5db09f4dc5}"
+EXPECTED_DUMP_SHA256="${EXPECTED_DUMP_SHA256-391c4931061a2ed8e9349b840b699d7080a743f2748fdc9655d959b94ede60d6}"
 
-# Extractors to run. build-lexicon ingests all but `compounds`, which is built
+# Extraction kinds. build-lexicon ingests all but `compounds`, which is built
 # for the runtime compound splitter and intentionally not baked into the FST.
 EXTRACTORS=(nouns verbs adjectives adverbs particles abbreviations propn pronouns compounds)
 
@@ -80,8 +80,9 @@ fi
 printf '[1/5] raw dump verified  sha256=%s\n' "${actual}"
 
 # --- 2. build the toolchain -------------------------------------------------
-printf '[2/5] building toolchain (cargo --release --features extractor) ...\n'
-cargo build --release --features extractor --bins --example dump_analyses
+printf '[2/5] building de-morph (cargo --release --features extractor) ...\n'
+cargo build --release --features extractor --bin de-morph
+DM="./target/release/de-morph"
 
 # --- 3. extract -------------------------------------------------------------
 if [[ "${SKIP_EXTRACT}" -eq 1 ]]; then
@@ -89,20 +90,25 @@ if [[ "${SKIP_EXTRACT}" -eq 1 ]]; then
 else
     mkdir -p data/wiktionary/processed
     for x in "${EXTRACTORS[@]}"; do
-        printf '[3/5] extract-%s ...\n' "${x}"
-        "./target/release/extract-${x}" \
+        printf '[3/5] de-morph extract %s ...\n' "${x}"
+        "${DM}" extract "${x}" \
             --input "${DUMP}" \
             --output "data/wiktionary/processed/${x}.jsonl"
     done
 fi
 
 # --- 4. build the lexicon (build-lexicon defaults) --------------------------
-printf '[4/5] build-lexicon ...\n'
+printf '[4/5] de-morph build-lexicon ...\n'
 mkdir -p data/lexicon
-./target/release/build-lexicon --fst-out "${FST_OUT}" --dat-out "${DAT_OUT}"
+"${DM}" build-lexicon --fst-out "${FST_OUT}" --dat-out "${DAT_OUT}"
+
+# Rebuild de-morph so `dump` below embeds the freshly built lexicon
+# (the binary embeds the FST at compile time via build.rs).
+cargo build --release --bin de-morph
+DM="./target/release/de-morph"
 
 # --- 5. verify the lossless fingerprint -------------------------------------
-dump_sha="$(./target/release/examples/dump_analyses | sum_stdin)"
+dump_sha="$("${DM}" dump | sum_stdin)"
 printf '[5/5] lossless analysis dump sha256=%s\n' "${dump_sha}"
 if [[ -n "${EXPECTED_DUMP_SHA256}" && "${dump_sha}" != "${EXPECTED_DUMP_SHA256}" ]]; then
     printf 'ERROR: lossless fingerprint changed\n  expected=%s\n  got     =%s\n' \
