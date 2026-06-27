@@ -98,6 +98,39 @@ pub fn is_clean_surface(surface: &str) -> bool {
         || surface.contains("]]"))
 }
 
+/// Dash characters Wiktionary uses as "no such form" placeholders or as
+/// the leading mark of a bound-morpheme/suffix entry: ASCII hyphen, en
+/// dash, em dash, non-breaking hyphen, and the Unicode minus sign.
+const DASH_CHARS: [char; 5] = ['-', '\u{2013}', '\u{2014}', '\u{2011}', '\u{2212}'];
+
+/// Whether a *multi-character* surface begins with a dash, marking it as
+/// an extraction artifact rather than a word. German has no word that
+/// starts with a hyphen, so surfaces like `-es`, `-en`, `-ibler`, or
+/// `-bach` are always one of:
+///
+/// - a phantom inflected form generated from a "—"/"-" comparative or
+///   plural placeholder cell (`-es`, `-en`, `-er`, `-em`),
+/// - a Wiktionary suffix abbreviation for a comparative (`-ibler`),
+/// - a bound-morpheme / suffix headword (`-bach`, `-chen`) that can
+///   never match a whole input token.
+///
+/// A *lone* dash (`-`, en/em dash) is excluded here: it is a real
+/// punctuation token, kept by the caller for its `PUNCT` analysis only
+/// (see [`is_lone_dash`]).
+pub fn is_dash_artifact_surface(surface: &str) -> bool {
+    let mut chars = surface.chars();
+    matches!(chars.next(), Some(c) if DASH_CHARS.contains(&c)) && chars.next().is_some()
+}
+
+/// Whether `surface` is a single dash character (ASCII hyphen, en/em
+/// dash, non-breaking hyphen, or minus). Such a token is real only as
+/// punctuation; the build keeps it for `PUNCT` and drops the noun/verb/
+/// adjective placeholder analyses that Wiktionary sometimes pins to it.
+pub fn is_lone_dash(surface: &str) -> bool {
+    let mut chars = surface.chars();
+    matches!(chars.next(), Some(c) if DASH_CHARS.contains(&c)) && chars.next().is_none()
+}
+
 /// Streaming builder. Records are added in arbitrary order; sorting
 /// and FST/side-table emission happens in [`LexiconBuilder::finish`].
 #[derive(Default)]
@@ -482,6 +515,30 @@ mod tests {
             "x\ty",
         ] {
             assert!(!is_clean_surface(bad), "failed to reject {bad:?}");
+        }
+    }
+
+    #[test]
+    fn dash_artifact_surfaces_flagged_but_lone_dash_kept() {
+        // Multi-char dash-led surfaces are extraction artifacts: phantom
+        // inflections of placeholder cells, suffix abbreviations, and
+        // bound-morpheme headwords. All flagged.
+        for bad in [
+            "-es", "-en", "-er", "-em", "-e", "-ibler", "-bach", "-chen", "–en", "—es",
+        ] {
+            assert!(is_dash_artifact_surface(bad), "missed artifact {bad:?}");
+            assert!(!is_lone_dash(bad), "lone-dash false positive {bad:?}");
+        }
+        // Lone dashes are real punctuation — not artifacts, but flagged as
+        // lone so the caller can keep only their PUNCT analysis.
+        for dash in ["-", "–", "—"] {
+            assert!(!is_dash_artifact_surface(dash), "over-flagged {dash:?}");
+            assert!(is_lone_dash(dash), "missed lone dash {dash:?}");
+        }
+        // Real words (incl. digit-led chemical/measure lemmas) untouched.
+        for ok in ["Tisch", "1-achsig", "1,2-Butadien", "groß"] {
+            assert!(!is_dash_artifact_surface(ok), "over-flagged {ok:?}");
+            assert!(!is_lone_dash(ok), "over-flagged {ok:?}");
         }
     }
 

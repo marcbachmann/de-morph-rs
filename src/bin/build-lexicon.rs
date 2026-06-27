@@ -17,7 +17,7 @@ use de_morph::analysis::{
     Aux, Case, Degree, Features, Gender, Mood, Number, Person, PronType, Source, Tense, VerbForm,
     UPOS,
 };
-use de_morph::lexicon::{is_clean_surface, LexiconBuilder};
+use de_morph::lexicon::{is_clean_surface, is_dash_artifact_surface, is_lone_dash, LexiconBuilder};
 use de_morph::paradigm::generate_closed_class_entries;
 use serde::Deserialize;
 
@@ -54,6 +54,7 @@ struct Counters {
     parsed: u64,
     skipped_unknown_field: u64,
     skipped_contaminated: u64,
+    skipped_placeholder: u64,
     by_pos: HashMap<&'static str, u64>,
     by_source: HashMap<&'static str, u64>,
 }
@@ -68,6 +69,7 @@ fn main() -> Result<()> {
         parsed: 0,
         skipped_unknown_field: 0,
         skipped_contaminated: 0,
+        skipped_placeholder: 0,
         by_pos: HashMap::new(),
         by_source: HashMap::new(),
     };
@@ -126,6 +128,12 @@ fn main() -> Result<()> {
         eprintln!(
             "  ({} surfaces dropped as contaminated markup/whitespace)",
             counters.skipped_contaminated
+        );
+    }
+    if counters.skipped_placeholder > 0 {
+        eprintln!(
+            "  ({} surfaces dropped as dash placeholders/suffix artifacts)",
+            counters.skipped_placeholder
         );
     }
 
@@ -207,6 +215,19 @@ fn ingest_file(
                 continue;
             }
         };
+
+        // Drop Wiktionary placeholder/suffix surfaces. A surface starting
+        // with a dash is never a real word token (`-es`, `-en`, `-ibler`,
+        // `-bach`) — these are phantom inflections of "—"/"-" placeholder
+        // cells or bound-morpheme headwords. A lone dash is kept only for
+        // its PUNCT analysis; its noun/adjective placeholder analyses go.
+        if is_dash_artifact_surface(&rec.surface)
+            || (is_lone_dash(&rec.surface) && pos != UPOS::PUNCT)
+        {
+            counters.skipped_placeholder += 1;
+            continue;
+        }
+
         let features = build_features(&rec, counters);
         let source = parse_source(rec.source.as_deref()).unwrap_or(Source::Attested);
 

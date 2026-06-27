@@ -27,6 +27,8 @@ pub mod build;
 pub mod format;
 pub mod load;
 
-pub use build::{is_clean_surface, BuildError, LexiconBuilder};
+pub use build::{
+    is_clean_surface, is_dash_artifact_surface, is_lone_dash, BuildError, LexiconBuilder,
+};
 pub use format::{AnalysisRecord, HEADER_SIZE, MAGIC};
 pub use load::{Lexicon, LoadError};

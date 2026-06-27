@@ -135,11 +135,9 @@ fn once_or_pair<'a>(a: Option<&'a str>, b: Option<&'a str>) -> Vec<Option<&'a st
 fn non_empty(value: Option<&str>) -> Option<&str> {
     value.and_then(|s| {
         let t = s.trim();
-        if t.is_empty() || t == "—" {
-            None
-        } else {
-            Some(t)
-        }
+        // Reject dash placeholders ("—"/"-") and suffix abbreviations
+        // ("-ibler"): a "no comparative" cell must not seed a paradigm.
+        super::is_real_form(t).then_some(t)
     })
 }
 

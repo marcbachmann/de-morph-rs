@@ -95,11 +95,9 @@ fn parse_hilfsverb(value: Option<&str>) -> Option<Aux> {
 fn non_empty(value: Option<&str>) -> Option<&str> {
     value.and_then(|s| {
         let t = s.trim();
-        if t.is_empty() || t == "—" {
-            None
-        } else {
-            Some(t)
-        }
+        // Reject dash placeholders and suffix artifacts so a missing
+        // conjugation cell never seeds a phantom paradigm.
+        super::is_real_form(t).then_some(t)
     })
 }
 

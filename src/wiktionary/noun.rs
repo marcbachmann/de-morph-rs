@@ -147,7 +147,9 @@ fn push_if_present(
         None => return,
     };
     let clean = strip_wikitext_noise(raw);
-    if clean.is_empty() || clean == "—" || clean.eq_ignore_ascii_case("—") {
+    // Skip dash placeholders ("—"/"-") that Wiktionary uses for missing
+    // number cells (singulare-/pluraletantum) — they are not word forms.
+    if !super::is_real_form(&clean) {
         return;
     }
     out.push(ExtractedEntry {

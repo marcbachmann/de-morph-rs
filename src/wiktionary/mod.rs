@@ -32,6 +32,26 @@ pub use template::{find_templates, parse_template_body, Template};
 
 use crate::analysis::{Features, Source, UPOS};
 
+/// Whether a template form cell holds a usable surface form.
+///
+/// Wiktionary marks an absent form — a non-comparable adjective's
+/// comparative, a singulare-/pluraletantum's missing number — with a
+/// dash placeholder (`-`, en/em dash, non-breaking hyphen) and sometimes
+/// abbreviates a comparative as a bare suffix (`-ibler`). None of these
+/// are real word forms. Feeding them to the paradigm generators seeds
+/// phantom stems that inflate into junk surfaces (`-es`, `-en`, `-er`,
+/// …), so every extractor drops such cells up front.
+///
+/// A real form must be non-empty after trimming, must contain at least
+/// one alphabetic character, and must not begin with a dash (no German
+/// word does — a leading dash always marks a placeholder or suffix).
+pub fn is_real_form(form: &str) -> bool {
+    let t = form.trim();
+    !t.is_empty()
+        && !t.starts_with(['-', '\u{2013}', '\u{2014}', '\u{2011}', '\u{2212}'])
+        && t.chars().any(char::is_alphabetic)
+}
+
 /// One extracted (surface form, analysis) record with provenance back
 /// to the source Wiktionary article. Shared between the noun and verb
 /// extractors (and future adjective / pronoun extractors).
@@ -53,4 +73,19 @@ pub struct ExtractedEntry {
     pub features: Features,
     pub source: Source,
     pub source_title: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_real_form;
+
+    #[test]
+    fn is_real_form_rejects_placeholders_and_suffixes() {
+        for bad in ["", "  ", "-", "—", "–", "-ibler", "-er", " — "] {
+            assert!(!is_real_form(bad), "wrongly accepted {bad:?}");
+        }
+        for ok in ["reversibler", "liebte", "Tische", "1,2-Butadien", "groß"] {
+            assert!(is_real_form(ok), "wrongly rejected {ok:?}");
+        }
+    }
 }
