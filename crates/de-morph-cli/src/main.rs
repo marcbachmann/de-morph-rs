@@ -21,9 +21,6 @@
 //!   eval-split      validate the compound splitter vs Wiktionary
 //!   dump-unmatched  dump unmatched (surface, lemma, pos) triples to JSONL
 
-#[path = "cli/loader.rs"]
-mod loader;
-
 #[path = "cli/analyze.rs"]
 mod analyze;
 #[path = "cli/bench.rs"]
@@ -36,6 +33,8 @@ mod dump_unmatched;
 mod eval;
 #[path = "cli/eval_split.rs"]
 mod eval_split;
+#[path = "cli/loader.rs"]
+mod loader;
 #[path = "cli/split.rs"]
 mod split;
 

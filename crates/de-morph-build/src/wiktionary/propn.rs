@@ -33,6 +33,7 @@
 //! - UD PROPN definition: <https://universaldependencies.org/u/pos/PROPN.html>
 
 use de_morph::analysis::{Case, Features, Gender, Number, Source, UPOS};
+
 use crate::wiktionary::template::{find_templates, Template};
 use crate::wiktionary::ExtractedEntry;
 

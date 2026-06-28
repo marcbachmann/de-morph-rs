@@ -36,6 +36,7 @@
 use std::collections::HashSet;
 
 use de_morph::analysis::{Case, Features, Gender, Number, PronType, Source, UPOS};
+
 use crate::wiktionary::template::{find_templates, Template};
 use crate::wiktionary::ExtractedEntry;
 
@@ -133,7 +134,15 @@ pub fn extract_pronouns(
         let mut seen = HashSet::new();
         for &(_, upos, pt) in &marks {
             if pt == PronType::Ind && seen.insert((upos, pt)) {
-                out.push(make_entry(title.to_string(), title, upos, None, None, None, pt));
+                out.push(make_entry(
+                    title.to_string(),
+                    title,
+                    upos,
+                    None,
+                    None,
+                    None,
+                    pt,
+                ));
             }
         }
         return out;
@@ -194,7 +203,13 @@ fn emit_table_cells(
                     format!("{case_name} Singular {gkey}*"),
                 ] {
                     push_cell(
-                        out, title, upos, Some(Number::Sg), gender, case, pron_type,
+                        out,
+                        title,
+                        upos,
+                        Some(Number::Sg),
+                        gender,
+                        case,
+                        pron_type,
                         tbl.named_arg(&key),
                     );
                 }
@@ -204,7 +219,13 @@ fn emit_table_cells(
                 format!("{case_name} Plural*"),
             ] {
                 push_cell(
-                    out, title, upos, Some(Number::Pl), None, case, pron_type,
+                    out,
+                    title,
+                    upos,
+                    Some(Number::Pl),
+                    None,
+                    case,
+                    pron_type,
                     tbl.named_arg(&key),
                 );
             }
@@ -215,7 +236,13 @@ fn emit_table_cells(
                     format!("{case_name} {num_name}*"),
                 ] {
                     push_cell(
-                        out, title, upos, Some(number), None, case, pron_type,
+                        out,
+                        title,
+                        upos,
+                        Some(number),
+                        None,
+                        case,
+                        pron_type,
                         tbl.named_arg(&key),
                     );
                 }
@@ -238,7 +265,13 @@ fn push_cell(
 ) {
     if let Some(clean) = form.and_then(clean_cell) {
         out.push(make_entry(
-            clean, title, upos, number, gender, Some(case), pron_type,
+            clean,
+            title,
+            upos,
+            number,
+            gender,
+            Some(case),
+            pron_type,
         ));
     }
 }
@@ -446,7 +479,9 @@ mod tests {
             }}";
         let e = extract_pronouns("derjenige", &page_de(body), &empty());
         // All cells are DET (demonstrative), Dem, lemma derjenige.
-        assert!(e.iter().all(|x| x.pos == UPOS::DET && x.lemma == "derjenige"));
+        assert!(e
+            .iter()
+            .all(|x| x.pos == UPOS::DET && x.lemma == "derjenige"));
         assert!(e
             .iter()
             .all(|x| x.features.pron_type == Some(PronType::Dem)));
@@ -497,8 +532,13 @@ mod tests {
             }}";
         let e = extract_pronouns("werauchimmer", &page_de(body), &empty());
         assert_eq!(e.len(), 4);
-        assert!(e.iter().all(|x| x.pos == UPOS::PRON && x.features.gender == None));
-        let gen_sg = e.iter().find(|x| x.features.case == Some(Case::Gen)).unwrap();
+        assert!(e
+            .iter()
+            .all(|x| x.pos == UPOS::PRON && x.features.gender == None));
+        let gen_sg = e
+            .iter()
+            .find(|x| x.features.case == Some(Case::Gen))
+            .unwrap();
         assert_eq!(gen_sg.surface, "werauchimmers");
     }
 
@@ -512,7 +552,10 @@ mod tests {
             |Genitiv Singular m=des\n\
             }}";
         let e = extract_pronouns("des", &page_de(body), &empty());
-        assert!(e.is_empty(), "inflected-form page should yield nothing: {e:?}");
+        assert!(
+            e.is_empty(),
+            "inflected-form page should yield nothing: {e:?}"
+        );
     }
 
     #[test]
@@ -605,7 +648,10 @@ mod tests {
         let body = "=== {{Wortart|Indefinitpronomen|Deutsch}} ===\n\
             {{Grundformverweis Dekl|all}}\n:al·les";
         let e = extract_pronouns("alles", &page_de(body), &empty());
-        assert!(e.is_empty(), "Grundformverweis page should be skipped: {e:?}");
+        assert!(
+            e.is_empty(),
+            "Grundformverweis page should be skipped: {e:?}"
+        );
     }
 
     #[test]
@@ -614,7 +660,10 @@ mod tests {
         // oblique/fused form, not a legitimate indeclinable lemma.
         let body = "=== {{Wortart|Demonstrativpronomen|Deutsch}} ===\n:all·dem";
         let e = extract_pronouns("alldem", &page_de(body), &empty());
-        assert!(e.is_empty(), "no-table demonstrative should not emit: {e:?}");
+        assert!(
+            e.is_empty(),
+            "no-table demonstrative should not emit: {e:?}"
+        );
     }
 
     #[test]

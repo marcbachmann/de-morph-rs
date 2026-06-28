@@ -13,7 +13,9 @@ use std::path::Path;
 
 use fst::Map as FstMap;
 
-use crate::analysis::{Analysis, Aux, Case, Features, Gender, Number, PackedFeatures, Source, UPOS};
+use crate::analysis::{
+    Analysis, Aux, Case, Features, Gender, Number, PackedFeatures, Source, UPOS,
+};
 use crate::lexicon::format::{
     bit_width, read_packed_u32, unpack_fst_value, AnalysisRecord, BitReader, Shape, HEADER_SIZE,
     MAGIC, SHAPE_ENTRY_SIZE, VERSION_MAJOR,
@@ -275,19 +277,30 @@ impl Lexicon {
         // Validate packed-field widths against the table sizes they derive
         // from, so a corrupt/mis-built width can't silently mis-decode.
         if lemma_bits != bit_width(num_lemmas) {
-            return Err(LoadError::CorruptHeader { field: "lemma_bits" });
+            return Err(LoadError::CorruptHeader {
+                field: "lemma_bits",
+            });
         }
         if shape_bits != bit_width(num_shapes) {
-            return Err(LoadError::CorruptHeader { field: "shape_bits" });
+            return Err(LoadError::CorruptHeader {
+                field: "shape_bits",
+            });
         }
         if set_id_bits != bit_width(num_shape_sets) {
-            return Err(LoadError::CorruptHeader { field: "set_id_bits" });
+            return Err(LoadError::CorruptHeader {
+                field: "set_id_bits",
+            });
         }
-        let lemma_bytes_len = shape_table_offset
-            .checked_sub(lemma_bytes_offset)
-            .ok_or(LoadError::Truncated { field: "lemma bytes" })?;
+        let lemma_bytes_len =
+            shape_table_offset
+                .checked_sub(lemma_bytes_offset)
+                .ok_or(LoadError::Truncated {
+                    field: "lemma bytes",
+                })?;
         if offset_bits != bit_width(lemma_bytes_len + 1) {
-            return Err(LoadError::CorruptHeader { field: "offset_bits" });
+            return Err(LoadError::CorruptHeader {
+                field: "offset_bits",
+            });
         }
 
         // Decode the shape table (a few hundred entries).
@@ -806,8 +819,12 @@ impl Lexicon {
         // Offsets are bit-packed at `offset_bits`; read element id and id+1.
         let start =
             read_packed_u32(&self.side, self.lemma_offsets_offset, id, self.offset_bits) as usize;
-        let end = read_packed_u32(&self.side, self.lemma_offsets_offset, id + 1, self.offset_bits)
-            as usize;
+        let end = read_packed_u32(
+            &self.side,
+            self.lemma_offsets_offset,
+            id + 1,
+            self.offset_bits,
+        ) as usize;
         let bytes_start = self.lemma_bytes_offset + start;
         let bytes_end = self.lemma_bytes_offset + end;
         match &self.side {

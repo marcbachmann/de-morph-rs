@@ -1,0 +1,19 @@
+[package]
+name = "de-morph-cli"
+version = "0.0.1"
+edition = "2021"
+rust-version = "1.74"
+description = "German morphological analyzer CLI (analyze / split / bench / eval)"
+license = "MIT"
+readme = "../../README.md"
+
+# Runtime CLI: analyze / split / bench / dump + eval diagnostics. Loads the
+# lexicon from disk at runtime (embeds nothing — no CC BY-SA bytes in the
+# binary). Depends only on the core library.
+[[bin]]
+name = "de-morph"
+path = "src/main.rs"
+
+[dependencies]
+de-morph-core = { path = "../de-morph-core", version = "0.0.1" }
+fst = "0.4"

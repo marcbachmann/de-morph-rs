@@ -78,7 +78,7 @@ version = "0.0.1"
 dependencies = [
  "anyhow",
  "bzip2",
- "de-morph-rs",
+ "de-morph-core",
  "fst",
  "quick-xml",
  "serde",
@@ -87,7 +87,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "de-morph-rs"
+name = "de-morph-cli"
+version = "0.0.1"
+dependencies = [
+ "de-morph-core",
+ "fst",
+]
+
+[[package]]
+name = "de-morph-core"
 version = "0.0.1"
 dependencies = [
  "fst",

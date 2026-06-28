@@ -1,36 +1,11 @@
-[package]
-name = "de-morph-rs"
-version = "0.0.1"
-edition = "2021"
-rust-version = "1.74"
-description = "German morphological analyzer based on finite-state transducers"
-license = "MIT"
-keywords = ["german", "morphology", "nlp", "fst", "linguistics"]
-categories = ["text-processing"]
-readme = "README.md"
-
-# data/ may carry CC BY-SA derivatives of German Wiktionary, and scripts/ is
-# dev-only tooling. Both MUST stay out of the published crate so cargo
-# consumers get only MIT-licensed bytes. Verify before any release with:
-#   cargo package --list | grep -E '^(data|scripts)/'
-exclude = ["data/*", "scripts/*"]
-
-[lib]
-name = "de_morph"
-
-# Build-time tooling (Wiktionary extraction + lexicon build + packaging)
-# lives in the de-morph-build member crate so its bz2/XML/serde deps never
-# enter this published library's dependency tree.
+# Virtual workspace. The crates split by dependency weight and role:
+#
+#   crates/de-morph-core   the published library (`de_morph`); deps: fst only.
+#   crates/de-morph-cli    the runtime CLI binary (`de-morph`); loads the lexicon
+#                          from disk and embeds nothing (no CC BY-SA bytes).
+#   crates/de-morph-build  build-time tooling (Wiktionary extraction, lexicon
+#                          build, packaging); the only crate pulling bz2/XML/
+#                          serde, so none of it reaches library consumers.
 [workspace]
-members = ["de-morph-build"]
-
-[dependencies]
-fst = "0.4"
-
-# The `de-morph` runtime binary: analyze / split / bench / dump + eval
-# diagnostics. It loads the lexicon from disk at runtime (it embeds
-# nothing — keeping this MIT binary free of CC BY-SA Wiktionary bytes) and
-# needs no dependency beyond the library's `fst`.
-[[bin]]
-name = "de-morph"
-path = "src/bin/de-morph.rs"
+resolver = "2"
+members = ["crates/*"]

@@ -13,6 +13,7 @@
 
 use de_morph::analysis::UPOS;
 use de_morph::paradigm::adjective::{generate_adjective_paradigm, AdjectiveAttested};
+
 use crate::wiktionary::template::{find_templates, Template};
 use crate::wiktionary::ExtractedEntry;
 
@@ -143,8 +144,9 @@ fn non_empty(value: Option<&str>) -> Option<&str> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use de_morph::analysis::{Case, Declension, Degree, Gender, Number, Source};
+
+    use super::*;
 
     fn page(body: &str) -> String {
         format!("== Headword ({{{{Sprache|Deutsch}}}}) ==\n{{{{{body}}}}}\n")

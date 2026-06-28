@@ -31,7 +31,10 @@ pub fn run(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
         let lex = if mode == "loadbytes" {
             Lexicon::from_bytes(fst, dat)?
         } else {
-            Lexicon::from_static(Box::leak(fst.into_boxed_slice()), Box::leak(dat.into_boxed_slice()))?
+            Lexicon::from_static(
+                Box::leak(fst.into_boxed_slice()),
+                Box::leak(dat.into_boxed_slice()),
+            )?
         };
         // Touch one lookup so the structure is real, not optimized away.
         let n = lex.analyze("Tisch").len();
@@ -84,7 +87,12 @@ pub fn run(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
     let secs = elapsed.as_secs_f64();
     println!("lexicon: from_bytes  fst={fst_len} B  dat={dat_len} B");
     println!("load: {:.2} ms", load_us as f64 / 1000.0);
-    println!("surfaces: {}   passes: {}   checksum: {}", words.len(), passes, checksum);
+    println!(
+        "surfaces: {}   passes: {}   checksum: {}",
+        words.len(),
+        passes,
+        checksum
+    );
     println!(
         "analyze calls: {}   analyses: {}   elapsed: {:.3} s",
         calls, analyses, secs

@@ -1,0 +1,17 @@
+[package]
+name = "de-morph-core"
+version = "0.0.1"
+edition = "2021"
+rust-version = "1.74"
+description = "German morphological analyzer based on finite-state transducers (core library)"
+license = "MIT"
+keywords = ["german", "morphology", "nlp", "fst", "linguistics"]
+categories = ["text-processing"]
+readme = "../../README.md"
+
+[lib]
+# Import path stays `de_morph` regardless of the package name.
+name = "de_morph"
+
+[dependencies]
+fst = "0.4"

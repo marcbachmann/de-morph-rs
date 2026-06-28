@@ -23,13 +23,13 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use anyhow::{bail, Context, Result};
-use serde::Serialize;
-
 use de_morph::analysis::{
-    Aux, Case, Declension, Degree, Gender, Mood, Number, Person, PronType, Source, Tense, UPOS,
-    VerbForm,
+    Aux, Case, Declension, Degree, Gender, Mood, Number, Person, PronType, Source, Tense, VerbForm,
+    UPOS,
 };
 use de_morph::paradigm::generate_closed_class_entries;
+use serde::Serialize;
+
 use crate::wiktionary::abbreviation::extract_abbreviations;
 use crate::wiktionary::adjective::extract_adjectives;
 use crate::wiktionary::adverb::{extract_adverbs, extract_particles};
@@ -144,8 +144,8 @@ pub fn run(args: &[String]) -> Result<()> {
     }
 
     let kind = kind.context("missing <kind> (try `de-morph-build extract --help`)")?;
-    let output = output
-        .unwrap_or_else(|| PathBuf::from(format!("data/wiktionary/processed/{kind}.jsonl")));
+    let output =
+        output.unwrap_or_else(|| PathBuf::from(format!("data/wiktionary/processed/{kind}.jsonl")));
 
     eprintln!("Reading {}", input.display());
     eprintln!("Writing {}", output.display());
@@ -179,7 +179,10 @@ pub fn run(args: &[String]) -> Result<()> {
         // Pronouns are deduplicated against the hand-curated closed-class
         // lemmas baked in at build time.
         let covered = covered_lemmas();
-        eprintln!("Excluding {} hand-curated closed-class lemmas", covered.len());
+        eprintln!(
+            "Excluding {} hand-curated closed-class lemmas",
+            covered.len()
+        );
         drive(&input, &output, limit, |page, w| {
             let mut n = 0;
             for e in extract_pronouns(&page.title, &page.text, &covered) {

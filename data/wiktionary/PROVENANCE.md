@@ -44,7 +44,8 @@ Usage tiers (see `data/README.md`):
   build time only; never shipped.
 - **derived lexicon** (`data/lexicon/lexicon.{fst,dat}`) — `ship`. A
   derivative of the snapshot, so it inherits CC BY-SA 4.0. It is **not**
-  part of the MIT cargo crate (`data/*` is excluded in `Cargo.toml`); it
+  part of the MIT cargo crates (`data/` lives at the repo root, outside
+  every crate under `crates/`, so it is never packaged); it
   is distributed separately, bundled with its licence and attribution by
   `de-morph-build package`. The MIT-licensed Rust source contains no
   Wiktionary-derived text.

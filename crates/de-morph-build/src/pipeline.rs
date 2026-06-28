@@ -37,9 +37,7 @@ pub fn run(args: &[String]) -> Result<()> {
         println!("[1/4] --skip-extract: not verifying raw dump");
     } else {
         if !std::path::Path::new(&dump).exists() {
-            bail!(
-                "raw dump missing: {dump}\n  run: bash scripts/fetch/dewiktionary.sh"
-            );
+            bail!("raw dump missing: {dump}\n  run: bash scripts/fetch/dewiktionary.sh");
         }
         let actual = sha256_file(&dump).with_context(|| format!("hashing {dump}"))?;
         if actual != config::RAW_SHA256 {
@@ -84,8 +82,8 @@ pub fn run(args: &[String]) -> Result<()> {
     // --- 4. verify the lossless fingerprint -------------------------------
     let dump_sha = fingerprint(config::FST_OUT, config::DAT_OUT)?;
     println!("[4/4] lossless analysis dump sha256={dump_sha}");
-    let expected =
-        std::env::var("EXPECTED_DUMP_SHA256").unwrap_or_else(|_| config::EXPECTED_DUMP_SHA256.into());
+    let expected = std::env::var("EXPECTED_DUMP_SHA256")
+        .unwrap_or_else(|_| config::EXPECTED_DUMP_SHA256.into());
     if !expected.is_empty() && dump_sha != expected {
         bail!(
             "lossless fingerprint changed\n  expected={expected}\n  got     ={dump_sha}\n\

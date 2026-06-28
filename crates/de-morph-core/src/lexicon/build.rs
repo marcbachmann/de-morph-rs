@@ -17,8 +17,8 @@ use fst::MapBuilder;
 
 use crate::analysis::{Aux, Features, PackedFeatures, Source, UPOS};
 use crate::lexicon::format::{
-    bit_width, pack_fst_value, BitWriter, Shape, HEADER_SIZE, MAGIC, MAX_SHAPE_ID, SHAPE_ENTRY_SIZE,
-    VERSION_MAJOR, VERSION_MINOR,
+    bit_width, pack_fst_value, BitWriter, Shape, HEADER_SIZE, MAGIC, MAX_SHAPE_ID,
+    SHAPE_ENTRY_SIZE, VERSION_MAJOR, VERSION_MINOR,
 };
 
 /// Error returned by [`LexiconBuilder::finish`].
@@ -383,7 +383,8 @@ impl LexiconBuilder {
         let analyses_offset = shape_set_dict_offset + set_dict_bytes as u64;
         let analyses_end = analyses_offset + groups_bytes.len() as u64;
 
-        let num_analyses = u32::try_from(total_readings).map_err(|_| BuildError::TooManyAnalyses)?;
+        let num_analyses =
+            u32::try_from(total_readings).map_err(|_| BuildError::TooManyAnalyses)?;
         let analyses_end_u32 =
             u32::try_from(analyses_end).map_err(|_| BuildError::SideTableTooLarge)?;
         let shape_table_offset_u32 =
@@ -608,7 +609,8 @@ mod tests {
         let mut b = LexiconBuilder::new();
         let feats = Features::noun(Gender::Masc);
         for surf in ["alpha", "beta", "gamma"] {
-            b.add(surf, "x", UPOS::NOUN, feats, Source::Attested).unwrap();
+            b.add(surf, "x", UPOS::NOUN, feats, Source::Attested)
+                .unwrap();
         }
         let mut fst = Vec::new();
         let mut side = Vec::new();
@@ -637,12 +639,30 @@ mod tests {
         // groups and expand each set. Readings are lemma-sorted, so the
         // two lemmas form two contiguous groups.
         let mut b = LexiconBuilder::new();
-        b.add("Leiter", "Leiter", UPOS::NOUN, Features::noun(Gender::Fem), Source::Attested)
-            .unwrap();
-        b.add("Leiter", "Leiter", UPOS::NOUN, Features::noun(Gender::Masc), Source::Attested)
-            .unwrap();
-        b.add("Leiter", "leiten", UPOS::VERB, Features::empty(), Source::Inflected)
-            .unwrap();
+        b.add(
+            "Leiter",
+            "Leiter",
+            UPOS::NOUN,
+            Features::noun(Gender::Fem),
+            Source::Attested,
+        )
+        .unwrap();
+        b.add(
+            "Leiter",
+            "Leiter",
+            UPOS::NOUN,
+            Features::noun(Gender::Masc),
+            Source::Attested,
+        )
+        .unwrap();
+        b.add(
+            "Leiter",
+            "leiten",
+            UPOS::VERB,
+            Features::empty(),
+            Source::Inflected,
+        )
+        .unwrap();
         let mut fst = Vec::new();
         let mut side = Vec::new();
         let stats = b.finish(&mut fst, &mut side).unwrap();
@@ -652,11 +672,12 @@ mod tests {
         let lex = Lexicon::from_bytes(fst, side).unwrap();
         let analyses = lex.analyze("Leiter");
         assert_eq!(analyses.len(), 3);
-        let lemmas: std::collections::BTreeSet<&str> =
-            analyses.iter().map(|a| &*a.lemma).collect();
+        let lemmas: std::collections::BTreeSet<&str> = analyses.iter().map(|a| &*a.lemma).collect();
         assert_eq!(
             lemmas,
-            ["Leiter", "leiten"].into_iter().collect::<std::collections::BTreeSet<_>>()
+            ["Leiter", "leiten"]
+                .into_iter()
+                .collect::<std::collections::BTreeSet<_>>()
         );
     }
 
@@ -702,8 +723,14 @@ mod tests {
             ("Tische", "Tisch", Gender::Masc, Number::Pl, Case::Nom),
             ("Frau", "Frau", Gender::Fem, Number::Sg, Case::Nom),
         ] {
-            b.add(sur, lemma, UPOS::NOUN, Features::noun_form(g, n, c), Source::Attested)
-                .unwrap();
+            b.add(
+                sur,
+                lemma,
+                UPOS::NOUN,
+                Features::noun_form(g, n, c),
+                Source::Attested,
+            )
+            .unwrap();
         }
         let mut fst = Vec::new();
         let mut side = Vec::new();

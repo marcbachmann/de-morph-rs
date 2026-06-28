@@ -82,7 +82,10 @@ pub fn run(args: &[String]) -> Result<()> {
         bail!("tar failed with status {status}");
     }
     let tar_sha = sha256_file(&tarball)?;
-    fs::write(format!("{tarball}.sha256"), format!("{tar_sha}  {tarball}\n"))?;
+    fs::write(
+        format!("{tarball}.sha256"),
+        format!("{tar_sha}  {tarball}\n"),
+    )?;
 
     let tar_len = fs::metadata(&tarball)?.len();
     println!("\nPackaged CC BY-SA 4.0 data bundle:");
@@ -94,7 +97,10 @@ pub fn run(args: &[String]) -> Result<()> {
 }
 
 fn attribution() -> String {
-    let base = config::DUMP_URL.rsplit_once('/').map(|(a, _)| a).unwrap_or("");
+    let base = config::DUMP_URL
+        .rsplit_once('/')
+        .map(|(a, _)| a)
+        .unwrap_or("");
     format!(
         "This artifact is a derivative of the German Wiktionary and is licensed under\n\
          the Creative Commons Attribution-ShareAlike 4.0 International licence\n\
@@ -115,7 +121,7 @@ fn provenance() -> String {
         "de-morph lexicon — provenance\n\
          =============================\n\n\
          artifact          : lexicon.fst + lexicon.dat\n\
-         on-disk format    : v{fmt} (de-morph-rs lexicon format)\n\
+         on-disk format    : v{fmt} (de-morph lexicon format)\n\
          built by          : de-morph-build v{ver}\n\n\
          source            : German Wiktionary (de.wiktionary.org)\n\
          snapshot          : {date}\n\
@@ -140,10 +146,10 @@ fn provenance() -> String {
 fn readme() -> String {
     format!(
         "# de-morph lexicon (data artifact)\n\n\
-         Prebuilt morphological lexicon for [de-morph-rs][crate], derived from the\n\
+         Prebuilt morphological lexicon for [de-morph][crate], derived from the\n\
          German Wiktionary snapshot `{date}`.\n\n\
          **Licence: CC BY-SA 4.0** (see `LICENSE` and `ATTRIBUTION`). This data\n\
-         artifact is *separate* from the de-morph-rs crate, which is MIT-licensed and\n\
+         artifact is *separate* from the de-morph crates, which are MIT-licensed and\n\
          contains none of these bytes. Using this artifact subjects the data — not your\n\
          code — to CC BY-SA's attribution and ShareAlike terms.\n\n\
          ## Files\n\n\
@@ -161,7 +167,7 @@ fn readme() -> String {
          let lex = de_morph::Lexicon::from_static(FST, DAT)?;\n\
          ```\n\n\
          Verify integrity: `sha256sum -c SHA256SUMS`.\n\n\
-         [crate]: https://crates.io/crates/de-morph-rs\n",
+         [crate]: https://crates.io/crates/de-morph-core\n",
         date = config::DUMP_DATE,
         fmt = config::FORMAT_VERSION,
     )

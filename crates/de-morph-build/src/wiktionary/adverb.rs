@@ -19,6 +19,7 @@
 //!   having a German adverb sense.
 
 use de_morph::analysis::{Features, PronType, Source, UPOS};
+
 use crate::wiktionary::ExtractedEntry;
 
 /// Return one `ExtractedEntry` per German adverb section found in

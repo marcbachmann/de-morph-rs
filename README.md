@@ -62,27 +62,27 @@ tag set and the morphological feature inventory.
 
     cargo build
 
-The published crate bundles no data (`data/` is excluded from the
-package — see `exclude` in `Cargo.toml`). With no lexicon loaded the
+The published library bundles no data: `data/` sits at the repo root,
+outside every crate, so it is never packaged. With no lexicon loaded the
 analyzer still returns best-effort out-of-vocabulary guesses; for real
 coverage, build a lexicon and open it with `Analyzer::open`.
 
-## CLI
+## Workspace
 
-Two binaries, split so the published library stays MIT-clean and
-dependency-light:
+A Cargo workspace of three crates under `crates/`, split by role and
+dependency weight:
 
-- **`de-morph`** (this crate) — the runtime: `analyze`, `split`, `bench`,
-  `dump`, `eval`, `eval-split`, `dump-unmatched`. It loads the lexicon
-  from `data/lexicon/` at runtime (override with `DE_MORPH_LEXICON_DIR`)
-  and **embeds nothing**, so the MIT binary carries no CC BY-SA
-  Wiktionary-derived bytes. Depends only on `fst`.
-
-- **`de-morph-build`** (the `de-morph-build/` workspace crate) — the
-  build pipeline: `extract <kind>`, `build`, `all`, `package`. `all` runs
-  the whole reproducible flow (verify the pinned dump → extract every POS
-  → build the FST → verify the lossless fingerprint); `package` stages the
-  CC BY-SA 4.0 data bundle. The bz2/XML/serde dependencies live only here.
+- **`de-morph-core`** — the library (`de_morph`). Depends only on `fst`.
+- **`de-morph-cli`** — the runtime CLI: `analyze`, `split`, `bench`, `dump`,
+  `eval`, `eval-split`, `dump-unmatched`. It loads the lexicon from
+  `data/lexicon/` at runtime (override with `DE_MORPH_LEXICON_DIR`) and
+  **embeds nothing**, so the MIT binary carries no CC BY-SA
+  Wiktionary-derived bytes.
+- **`de-morph-build`** — the build pipeline: `extract <kind>`, `build`,
+  `all`, `package`. `all` runs the whole reproducible flow (verify the
+  pinned dump → extract every POS → build the FST → verify the lossless
+  fingerprint); `package` stages the CC BY-SA 4.0 data bundle. The
+  bz2/XML/serde tooling dependencies live only here.
 
 Typical flow:
 

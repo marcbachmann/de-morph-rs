@@ -249,7 +249,11 @@ pub fn read_packed_u32(data: &[u8], base: usize, index: usize, width: u32) -> u3
         bit_in_byte = 0;
         byte += 1;
     }
-    let mask = if width == 32 { u64::MAX } else { (1u64 << width) - 1 };
+    let mask = if width == 32 {
+        u64::MAX
+    } else {
+        (1u64 << width) - 1
+    };
     (acc & mask) as u32
 }
 
@@ -276,7 +280,10 @@ impl BitWriter {
             return;
         }
         debug_assert!(width <= 32);
-        debug_assert!(width == 32 || value < (1u32 << width), "value overflows width");
+        debug_assert!(
+            width == 32 || value < (1u32 << width),
+            "value overflows width"
+        );
         self.acc |= (value as u64) << self.nbits;
         self.nbits += width;
         while self.nbits >= 8 {
