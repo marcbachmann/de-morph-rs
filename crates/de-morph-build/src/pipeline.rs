@@ -37,7 +37,11 @@ pub fn run(args: &[String]) -> Result<()> {
         println!("[1/4] --skip-extract: not verifying raw dump");
     } else {
         if !std::path::Path::new(&dump).exists() {
-            bail!("raw dump missing: {dump}\n  run: bash scripts/fetch/dewiktionary.sh");
+            println!(
+                "[1/4] raw dump missing, downloading {} ...",
+                config::DUMP_URL
+            );
+            download_dump(&dump).with_context(|| format!("downloading {}", config::DUMP_URL))?;
         }
         let actual = sha256_file(&dump).with_context(|| format!("hashing {dump}"))?;
         if actual != config::RAW_SHA256 {
@@ -111,6 +115,36 @@ pub fn fingerprint(fst: &str, dat: &str) -> Result<String> {
     let mut hw = HashWriter(Sha256::new());
     lex.write_canonical_dump(&mut hw)?;
     Ok(hex(hw.0.finalize()))
+}
+
+/// Download the pinned raw dump to `dest`. Streams into a sibling `.part`
+/// file and renames on success, so an interrupted download never leaves a
+/// truncated file that the next run would mistake for a valid cache. The
+/// sha256 gate in `run` is the integrity check — this just fetches bytes.
+///
+/// Wikimedia blocks requests without a descriptive User-Agent, so we send
+/// a descriptive one.
+fn download_dump(dest: &str) -> Result<()> {
+    if let Some(parent) = std::path::Path::new(dest).parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let resp = ureq::get(config::DUMP_URL)
+        .set(
+            "User-Agent",
+            "de-morph-rs dewiktionary-fetch (Marc Bachmann; marc@livingdocs.io)",
+        )
+        .call()
+        .context("HTTP request failed")?;
+
+    let part = format!("{dest}.part");
+    let mut reader = resp.into_reader();
+    let mut out = File::create(&part).with_context(|| format!("creating {part}"))?;
+    let n = io::copy(&mut reader, &mut out).with_context(|| format!("writing {part}"))?;
+    out.flush()?;
+    drop(out);
+    std::fs::rename(&part, dest).with_context(|| format!("renaming {part} -> {dest}"))?;
+    println!("[1/4] downloaded {n} bytes");
+    Ok(())
 }
 
 /// sha256 of a file, streamed in chunks.

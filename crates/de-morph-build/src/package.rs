@@ -131,8 +131,7 @@ fn provenance() -> String {
          lossless fingerprint (sha256 of the canonical analysis dump over all surfaces):\n\
          \x20                   {fp}\n\n\
          Reproduce from the dump:\n\
-         \x20   bash scripts/fetch/dewiktionary.sh        # fetch + verify the snapshot\n\
-         \x20   de-morph-build all                        # extract + build + verify\n\
+         \x20   de-morph-build all                        # fetch + extract + build + verify\n\
          \x20   de-morph-build package                    # produce this bundle\n",
         fmt = config::FORMAT_VERSION,
         ver = CRATE_VERSION,

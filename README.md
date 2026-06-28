@@ -25,8 +25,6 @@ license texts live under `LICENSES/`.
     data/              external data + generated build artifacts
         wiktionary/    lexicon source (CC BY-SA 4.0); see PROVENANCE.md
         lexicon/       generated FST + side table (gitignored)
-    scripts/           reproducible fetch and build scripts
-        fetch/         one script per upstream source
     LICENSES/          verbatim third-party license texts
     NOTICE             project-level third-party attribution
     CONTRIBUTING.md    data-sourcing policy
@@ -79,16 +77,18 @@ dependency weight:
   **embeds nothing**, so the MIT binary carries no CC BY-SA
   Wiktionary-derived bytes.
 - **`de-morph-build`** — the build pipeline: `extract <kind>`, `build`,
-  `all`, `package`. `all` runs the whole reproducible flow (verify the
-  pinned dump → extract every POS → build the FST → verify the lossless
-  fingerprint); `package` stages the CC BY-SA 4.0 data bundle. The
-  bz2/XML/serde tooling dependencies live only here.
+  `all`, `package`. `all` runs the whole reproducible flow (fetch +
+  verify the pinned dump → extract every POS → build the FST → verify the
+  lossless fingerprint); `package` stages the CC BY-SA 4.0 data bundle.
+  The bz2/XML/serde/HTTP tooling dependencies live only here.
 
 Typical flow:
 
-    bash scripts/fetch/dewiktionary.sh   # fetch + verify the dump
-    cargo run -p de-morph-build --release -- all
+    cargo run -p de-morph-build --release -- all   # fetch (if needed) → build
     cargo run --release -- analyze "Ich gehe zur Schule."
+
+`all` downloads the pinned dump automatically when it is missing, then
+verifies its sha256 before building.
 
 Run `de-morph --help` / `de-morph-build --help` for the full list.
 

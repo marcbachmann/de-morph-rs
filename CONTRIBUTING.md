@@ -62,10 +62,13 @@ reject commits that add files under `data/<source-id>/` without it.
 
 ## 6. Reproducible fetch
 
-Add `scripts/fetch/<source-id>.sh` that downloads the raw artefact
-deterministically and verifies the hash recorded in
-`PROVENANCE.md`. CI (when set up) re-runs these to catch upstream
-tampering and to keep the snapshot reproducible.
+Pin the source in `crates/de-morph-build/src/config.rs` — a dated
+snapshot URL and its sha256 — and have the build pipeline download the
+raw artefact into `data/<source-id>/raw/` when missing, then verify the
+hash before use (see `pipeline.rs::download_dump`). Never pin a "latest"
+URL; it moves and breaks the provenance chain. CI (when set up) re-runs
+the pipeline to catch upstream tampering and keep the snapshot
+reproducible.
 
 ## Methods from papers
 

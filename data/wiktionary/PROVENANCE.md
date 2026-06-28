@@ -85,9 +85,11 @@ mechanically available.
 
 The lexicon is deterministic given this snapshot:
 
-    bash scripts/fetch/dewiktionary.sh                  # fetch + verify (sha256 above)
-    cargo run -p de-morph-build --release -- all        # extract → build → verify
+    cargo run -p de-morph-build --release -- all        # fetch → extract → build → verify
     cargo run -p de-morph-build --release -- package    # CC BY-SA bundle for shipping
+
+`all` downloads the pinned dump into `data/wiktionary/raw/` if it is
+missing, then verifies the sha256 recorded below before building.
 
 `de-morph-build all` reproduces `data/lexicon/lexicon.{fst,dat}`
 byte-for-byte and asserts the lossless analysis fingerprint:
@@ -104,13 +106,13 @@ byte-for-byte and asserts the lossless analysis fingerprint:
 
 ## How to refresh
 
-    bash scripts/fetch/dewiktionary.sh
+    cargo run -p de-morph-build --release -- all
 
-The fetch script downloads the snapshot, verifies the sha256 recorded
-in this file, and writes to `data/wiktionary/raw/`. To pin a
-different snapshot:
+`de-morph-build all` downloads the snapshot (if missing), verifies the
+sha256 recorded in this file, and writes to `data/wiktionary/raw/`.
 
-    DUMP_DATE=20260620 bash scripts/fetch/dewiktionary.sh
-
-Then re-run `de-morph-build all`; if the snapshot changed, update the
-hashes above (raw sha256 and the lossless fingerprint).
+To pin a different snapshot, edit the pins in
+`crates/de-morph-build/src/config.rs` (`DUMP_DATE`, `DUMP_URL`,
+`RAW_SHA256`), delete the old `raw/*.xml.bz2`, and re-run
+`de-morph-build all`. If the snapshot changed, update the hashes above
+(raw sha256 and the lossless fingerprint).
