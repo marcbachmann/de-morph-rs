@@ -2,11 +2,11 @@ target/
 **/*.rs.bk
 
 # Raw fetched data and intermediate build artifacts are regenerable from
-# the fetch scripts + sha256-pinned upstream snapshots. Processed outputs
-# (e.g. data/wiktionary/processed/nouns.jsonl) are also regenerable from
-# raw/ via the extractor binaries and would bloat the repo if committed.
-# The eventual shipped artifact (compiled FST) lives elsewhere under its
-# own provenance entry; it is not under data/.
+# the sha256-pinned upstream snapshot (`de-morph-build all` downloads it).
+# Processed outputs (e.g. data/wiktionary/processed/nouns.jsonl) are also
+# regenerable from raw/ via the extractors and would bloat the repo if
+# committed. The shipped artifact (compiled FST) lives under dist/ with
+# its own provenance entry; it is not under data/.
 /data/**/raw/
 /data/**/build/
 /data/**/processed/
@@ -19,7 +19,7 @@ target/
 /data/lexicon/*.dat
 /data/lexicon/*.jsonl
 
-# Packaged CC BY-SA data bundles (scripts/build/package-data.sh output).
+# Packaged CC BY-SA data bundles (`de-morph-build package` output).
 # Regenerable from the snapshot; shipped as release assets, not committed.
 /dist/
 
