@@ -16,7 +16,7 @@ pub const RAW_SHA256: &str = "daed03b88f52175c13c742876793894b73d0edf1d3eb946463
 /// lossless fingerprint. Override at runtime with `EXPECTED_DUMP_SHA256`
 /// (empty disables the gate, e.g. when intentionally changing contents).
 pub const EXPECTED_DUMP_SHA256: &str =
-    "391c4931061a2ed8e9349b840b699d7080a743f2748fdc9655d959b94ede60d6";
+    "d452dca67f9cc679f92cffccd3330016e0477afc21534b25cc65ceb8d73d660f";
 
 /// On-disk lexicon format major version (see `src/lexicon/format.rs`).
 pub const FORMAT_VERSION: &str = "7";

@@ -14,7 +14,7 @@ use std::path::Path;
 use fst::Map as FstMap;
 
 use crate::analysis::{
-    Analysis, Aux, Case, Features, Gender, Number, PackedFeatures, Source, UPOS,
+    Analysis, Aux, Case, Declension, Features, Gender, Number, PackedFeatures, Source, UPOS,
 };
 use crate::lexicon::format::{
     bit_width, read_packed_u32, unpack_fst_value, AnalysisRecord, BitReader, Shape, HEADER_SIZE,
@@ -634,6 +634,241 @@ impl Lexicon {
                 linkers.pop();
             }
         }
+    }
+
+    /// OOV fallback for SOLID (un-hyphenated) compounds whose whole
+    /// form is not attested but which decompose into a known left part
+    /// followed by a known nominal HEAD — e.g. `Volksinitiative` (not
+    /// in the lexicon) → `Volk` +s+ `Initiative` (head attested Fem).
+    ///
+    /// German compounds are right-headed: the rightmost element carries
+    /// POS, gender, and inflection. We therefore read the head's
+    /// analyses directly via [`analyze`](Self::analyze) (rather than
+    /// requiring a citation-form lemma as [`split_compound_detailed`]
+    /// does), which makes *inflected* heads resolve too —
+    /// `Volksinitiativen` → Fem **Pl** with singular compound lemma
+    /// `Volksinitiative`. Each result is tagged [`Source::Composed`]:
+    /// every part is in the lexicon, but the whole was never attested,
+    /// mirroring the hyphenated path.
+    ///
+    /// Only the single best-scoring split is expanded (longer parts and
+    /// noun-lemma heads win), so we never emit competing low-quality
+    /// decompositions. Returns empty if no valid split is found.
+    pub fn analyze_solid_compound(&self, surface: &str) -> Vec<Analysis> {
+        use std::collections::HashSet;
+        let char_boundaries: Vec<usize> = surface
+            .char_indices()
+            .map(|(i, _)| i)
+            .chain(std::iter::once(surface.len()))
+            .collect();
+        let total_chars = char_boundaries.len() - 1;
+        // Match the solid splitter's minimum: 3-char left + 3-char head.
+        if total_chars < 6 {
+            return Vec::new();
+        }
+        // (score, prefix_surface, head_hits) for the best split so far.
+        let mut best: Option<(f64, String, Vec<Analysis>)> = None;
+        for split_at_char in 3..=(total_chars - 3) {
+            let split_byte = char_boundaries[split_at_char];
+            let left = &surface[..split_byte];
+            // Validate the left as a compound prefix in any of the three
+            // cases the solid splitter accepts (verbatim, capitalised,
+            // lowercased) and keep the validated form for the linker check.
+            let left_cap = capitalize(left);
+            let left_lower = lowercase_first(left);
+            let left_for_linker = if self.is_valid_compound_left(left) {
+                left.to_string()
+            } else if self.is_valid_compound_left(&left_cap) {
+                left_cap.clone()
+            } else if self.is_valid_compound_left(&left_lower) {
+                left_lower.clone()
+            } else {
+                continue;
+            };
+            for linker in &["", "s", "es", "n", "en", "er"] {
+                let tail = &surface[split_byte..];
+                if !tail.starts_with(*linker) {
+                    continue;
+                }
+                let head_start = split_byte + linker.len();
+                if head_start >= surface.len() {
+                    continue;
+                }
+                let head_surface = &surface[head_start..];
+                if head_surface.chars().count() < 3 {
+                    continue;
+                }
+                if !self.is_valid_compound_linker(&left_for_linker, linker) {
+                    continue;
+                }
+                // The head appears lowercased inside the compound; its
+                // citation form is capitalised, so look it up that way.
+                let head_cap = capitalize(head_surface);
+                let mut head_hits: Vec<Analysis> = self
+                    .analyze(&head_cap)
+                    .into_iter()
+                    .filter(|a| a.pos == UPOS::NOUN || a.pos == UPOS::PROPN)
+                    .collect();
+                // Adjectival head fallback: heads like `…beauftragter`,
+                // `…angestellte`, `…vorsitzende` are substantivised
+                // adjectives — not noun lemmas, so the lookup above
+                // finds nothing. Resolve them through the adjective
+                // paradigm (right-headed, declines adjectivally).
+                if head_hits.is_empty() {
+                    head_hits = self.substantivized_adjective_analyses(head_surface);
+                }
+                if head_hits.is_empty() {
+                    continue;
+                }
+                // Score consistently with the solid splitter, plus a bonus
+                // for longer heads (the most specific right-headed split).
+                let head_lemma = head_hits[0].lemma.to_string();
+                let score = self.score_split(&[left_for_linker.clone(), head_lemma])
+                    + head_surface.chars().count() as f64;
+                if best.as_ref().map(|(s, ..)| score > *s).unwrap_or(true) {
+                    let prefix = surface[..head_start].to_string();
+                    best = Some((score, prefix, head_hits));
+                }
+            }
+        }
+        let (_, prefix, head_hits) = match best {
+            Some(b) => b,
+            None => return Vec::new(),
+        };
+        let mut out = Vec::new();
+        let mut seen: HashSet<(String, u8, u32)> = HashSet::new();
+        for a in head_hits {
+            // Re-prefix the head lemma to build the compound lemma. The
+            // head sits mid-word, so its citation capital is lowercased:
+            // `Volks` + lower(`Initiative`) → `Volksinitiative`.
+            let lemma = format!("{prefix}{}", lowercase_first(&a.lemma));
+            let key = (
+                lemma.clone(),
+                a.pos as u8,
+                PackedFeatures::pack(a.features).0,
+            );
+            if !seen.insert(key) {
+                continue;
+            }
+            out.push(Analysis {
+                lemma: lemma.into(),
+                pos: a.pos,
+                features: a.features,
+                source: Source::Composed,
+            });
+        }
+        out
+    }
+
+    /// Analyse a surface as a SUBSTANTIVISED ADJECTIVE — a noun that
+    /// inflects adjectivally (`Beauftragter`, `Angestellte`,
+    /// `Vorsitzende`, `Abgeordneter`). These are not noun lemmas; they
+    /// decline like the underlying adjective (strong without a
+    /// determiner, weak after a definite article), so we run the
+    /// adjective paradigm and re-tag matching cells as [`UPOS::NOUN`].
+    ///
+    /// The citation lemma is the masculine-nominative-singular STRONG
+    /// positive form (`Beauftragter`), matching Wiktionary's page-title
+    /// convention for substantivised adjectives. Only positive-degree,
+    /// inflected (gendered) cells are emitted — the bare predicative
+    /// form carries no gender/number/case and is useless as a noun.
+    ///
+    /// Used by [`analyze_solid_compound`](Self::analyze_solid_compound)
+    /// for adjectival compound heads (`Datenschutz` + `beauftragter`);
+    /// the analyses are returned with [`Source::Inflected`] and the
+    /// caller re-tags/re-prefixes as needed.
+    ///
+    /// To avoid false positives — the adjective paradigm of *any* stem
+    /// regenerates the very declension ending we peeled, so an arbitrary
+    /// OOV remainder (`tomatt`, `restaurant`, `hausmeister`) would
+    /// otherwise produce an invented nominalisation — a candidate base
+    /// is only accepted when it is **attested** in the lexicon as an
+    /// adjective lemma or a verb participle (PtcPerf/PtcPres). That is
+    /// precisely the closed set German substantivises (`groß` →
+    /// `Große`, `beauftragt`/`angestellt` participles → `Beauftragter`).
+    pub fn substantivized_adjective_analyses(&self, surface: &str) -> Vec<Analysis> {
+        use crate::analysis::{Degree, VerbForm};
+        use crate::paradigm::adjective::{generate_adjective_paradigm, AdjectiveAttested};
+        // Adjective lemmas are lowercase; the head sits mid-compound so
+        // it is already lowercase, but normalise for the standalone case.
+        let lower = lowercase_first(surface);
+        if lower.chars().count() < 3 {
+            return Vec::new();
+        }
+        // A candidate base is adjectival only if the lexicon attests it
+        // as an adjective lemma or a participle (the productive source of
+        // substantivised adjectives). This is the gate that rejects
+        // arbitrary OOV remainders.
+        let is_adjectival_base = |stem: &str| {
+            self.analyze(stem).iter().any(|a| {
+                (a.pos == UPOS::ADJ && a.lemma == stem)
+                    || (a.pos == UPOS::VERB
+                        && matches!(
+                            a.features.form,
+                            Some(VerbForm::PtcPerf) | Some(VerbForm::PtcPres)
+                        ))
+            })
+        };
+        // Candidate adjective lemmas: the surface itself, then forms with
+        // a declension ending peeled off (longest first). The first
+        // candidate that yields any gendered cell match wins, so we never
+        // mix decompositions from competing lemmas.
+        let mut candidates: Vec<String> = vec![lower.clone()];
+        for ending in ["er", "es", "en", "em", "e"] {
+            if let Some(stem) = lower.strip_suffix(ending) {
+                if stem.chars().count() >= 3 {
+                    candidates.push(stem.to_string());
+                }
+            }
+        }
+        for lemma in candidates {
+            if !is_adjectival_base(&lemma) {
+                continue;
+            }
+            let paradigm = generate_adjective_paradigm(&AdjectiveAttested {
+                lemma: &lemma,
+                komparativ: None,
+                superlativ: None,
+            });
+            // Citation = masc-nom-sg-strong positive form.
+            let citation = paradigm.iter().find_map(|(form, a)| {
+                if a.features.degree == Some(Degree::Pos)
+                    && a.features.declension == Some(Declension::Strong)
+                    && a.features.gender == Some(Gender::Masc)
+                    && a.features.number == Some(Number::Sg)
+                    && a.features.case == Some(Case::Nom)
+                {
+                    Some(capitalize(form))
+                } else {
+                    None
+                }
+            });
+            let citation = match citation {
+                Some(c) => c,
+                None => continue,
+            };
+            let mut out = Vec::new();
+            for (form, a) in &paradigm {
+                // Only positive-degree, gendered (declined) cells become
+                // noun analyses; skip predicative/comparative noise.
+                if a.features.degree != Some(Degree::Pos) || a.features.gender.is_none() {
+                    continue;
+                }
+                if lowercase_first(form) != lower {
+                    continue;
+                }
+                out.push(Analysis {
+                    lemma: citation.clone().into(),
+                    pos: UPOS::NOUN,
+                    features: a.features,
+                    source: Source::Inflected,
+                });
+            }
+            if !out.is_empty() {
+                return out;
+            }
+        }
+        Vec::new()
     }
 
     /// Like [`split_compound_detailed`] but sorted by score (best first).

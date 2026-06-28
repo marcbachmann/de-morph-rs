@@ -160,6 +160,16 @@ impl Analyzer {
                     return h;
                 }
             }
+            // Solid-compound fallback. Nothing attested and no hyphen:
+            // try decomposing the whole surface into a known left part +
+            // a known nominal head (Volksinitiative → Volk +s+
+            // Initiative). German compounds are right-headed, so the
+            // head's gender/number/case drive the analysis — far better
+            // than the Strong-Masc default the OOV guesser would emit.
+            let solid = lex.analyze_solid_compound(surface);
+            if !solid.is_empty() {
+                return solid;
+            }
         }
         if self.fallback_oov {
             let mut out = Vec::new();
@@ -984,6 +994,162 @@ mod tests {
         assert!(!hits.is_empty(), "multi-hyphen split failed");
         let h = hits.iter().find(|a| a.pos == UPOS::NOUN).unwrap();
         assert_eq!(h.lemma, "Eis-Tee-Latte");
+    }
+
+    /// Build a lexicon with `Volk` (+ Gen-Sg `Volks` for the Fugen-s)
+    /// and `Initiative` (Sg + Pl), used by the solid-compound tests.
+    fn solid_compound_lexicon() -> Lexicon {
+        let mut b = LexiconBuilder::new();
+        b.add(
+            "Volk",
+            "Volk",
+            UPOS::NOUN,
+            Features::noun_form(Gender::Neut, Number::Sg, Case::Nom),
+            Source::Attested,
+        )
+        .unwrap();
+        // Gen-Sg `Volks` validates the Fugen-s linker in Volk+s+….
+        b.add(
+            "Volks",
+            "Volk",
+            UPOS::NOUN,
+            Features::noun_form(Gender::Neut, Number::Sg, Case::Gen),
+            Source::Attested,
+        )
+        .unwrap();
+        for case in [Case::Nom, Case::Gen, Case::Dat, Case::Acc] {
+            b.add(
+                "Initiative",
+                "Initiative",
+                UPOS::NOUN,
+                Features::noun_form(Gender::Fem, Number::Sg, case),
+                Source::Attested,
+            )
+            .unwrap();
+        }
+        b.add(
+            "Initiativen",
+            "Initiative",
+            UPOS::NOUN,
+            Features::noun_form(Gender::Fem, Number::Pl, Case::Nom),
+            Source::Attested,
+        )
+        .unwrap();
+        let mut fst = Vec::new();
+        let mut side = Vec::new();
+        b.finish(&mut fst, &mut side).unwrap();
+        Lexicon::from_bytes(fst, side).unwrap()
+    }
+
+    #[test]
+    fn analyzer_splits_solid_compound_singular() {
+        // `Volksinitiative` is not attested as a whole, but decomposes
+        // into `Volk` +s+ `Initiative`. German compounds are
+        // right-headed, so the head's gender (Fem) and case drive the
+        // analysis — not the Strong-Masc OOV fallback.
+        let analyzer = Analyzer::from_lexicon(solid_compound_lexicon()).with_oov_fallback(false);
+        let hits = analyzer.analyze("Volksinitiative");
+        assert!(!hits.is_empty(), "solid-compound split failed");
+        assert!(
+            hits.iter().all(|a| a.features.gender == Some(Gender::Fem)),
+            "expected all-Fem head morphology, got {hits:#?}"
+        );
+        let nom = hits
+            .iter()
+            .find(|a| a.features.case == Some(Case::Nom) && a.features.number == Some(Number::Sg))
+            .expect("missing Fem Sg Nom in solid-compound analysis");
+        assert_eq!(nom.lemma, "Volksinitiative");
+        assert_eq!(nom.source, Source::Composed);
+    }
+
+    #[test]
+    fn analyzer_splits_solid_compound_adjectival_head() {
+        // `Datenschutzbeauftragter` = `Datenschutz` + substantivised
+        // adjective head `Beauftragter` (the participle `beauftragt`
+        // declined adjectivally, masc-nom-sg-strong). The head isn't a
+        // noun lemma, so it resolves via the adjective paradigm; the
+        // compound lemma is the masc-nom-sg-strong citation.
+        let mut b = LexiconBuilder::new();
+        b.add(
+            "Datenschutz",
+            "Datenschutz",
+            UPOS::NOUN,
+            Features::noun_form(Gender::Masc, Number::Sg, Case::Nom),
+            Source::Attested,
+        )
+        .unwrap();
+        // The adjectival head is only nominalised when its base is an
+        // attested adjective/participle — here the ADJ `beauftragt`.
+        b.add(
+            "beauftragt",
+            "beauftragt",
+            UPOS::ADJ,
+            Features::empty(),
+            Source::Attested,
+        )
+        .unwrap();
+        let mut fst = Vec::new();
+        let mut side = Vec::new();
+        b.finish(&mut fst, &mut side).unwrap();
+        let analyzer = Analyzer::from_lexicon(Lexicon::from_bytes(fst, side).unwrap())
+            .with_oov_fallback(false);
+        let hits = analyzer.analyze("Datenschutzbeauftragter");
+        assert!(!hits.is_empty(), "adjectival-head split failed");
+        let masc_nom = hits
+            .iter()
+            .find(|a| {
+                a.pos == UPOS::NOUN
+                    && a.features.gender == Some(Gender::Masc)
+                    && a.features.number == Some(Number::Sg)
+                    && a.features.case == Some(Case::Nom)
+            })
+            .expect("missing Masc Sg Nom in adjectival-head compound");
+        assert_eq!(masc_nom.lemma, "Datenschutzbeauftragter");
+        assert_eq!(masc_nom.source, Source::Composed);
+    }
+
+    #[test]
+    fn solid_compound_adjectival_head_requires_attested_base() {
+        // Guard against false positives: a surface like `Datenschutzxyte`
+        // would otherwise force-split into `Datenschutz` + an OOV-
+        // generated adjective head `xyt`, inventing a noun. With no
+        // attested adjective/participle base for the head, the
+        // adjectival path must NOT fire.
+        let mut b = LexiconBuilder::new();
+        b.add(
+            "Datenschutz",
+            "Datenschutz",
+            UPOS::NOUN,
+            Features::noun_form(Gender::Masc, Number::Sg, Case::Nom),
+            Source::Attested,
+        )
+        .unwrap();
+        let mut fst = Vec::new();
+        let mut side = Vec::new();
+        b.finish(&mut fst, &mut side).unwrap();
+        let analyzer = Analyzer::from_lexicon(Lexicon::from_bytes(fst, side).unwrap())
+            .with_oov_fallback(false);
+        let hits = analyzer.analyze("Datenschutzxyte");
+        assert!(
+            hits.is_empty(),
+            "expected no spurious adjectival-head split, got {hits:#?}"
+        );
+    }
+
+    #[test]
+    fn analyzer_splits_solid_compound_inflected_head() {
+        // `Volksinitiativen` — the head is the *inflected* plural
+        // `Initiativen`, so the compound resolves to Fem Pl with the
+        // singular compound lemma.
+        let analyzer = Analyzer::from_lexicon(solid_compound_lexicon()).with_oov_fallback(false);
+        let hits = analyzer.analyze("Volksinitiativen");
+        let pl = hits
+            .iter()
+            .find(|a| a.features.number == Some(Number::Pl))
+            .expect("missing Fem Pl in inflected-head solid compound");
+        assert_eq!(pl.features.gender, Some(Gender::Fem));
+        assert_eq!(pl.lemma, "Volksinitiative");
+        assert_eq!(pl.source, Source::Composed);
     }
 
     #[test]
