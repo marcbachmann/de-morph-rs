@@ -1,4 +1,4 @@
-//! `de-morph extract <kind>` — extract analyses from a Wiktionary dump.
+//! `de-morph-build extract <kind>` — extract analyses from a Wiktionary dump.
 //!
 //! Unifies the former `extract-*` binaries. Each `kind` reads the dump,
 //! runs the matching extractor over every main-namespace page, and writes
@@ -8,7 +8,7 @@
 //! and what the splitter eval reads.
 //!
 //! Usage:
-//!   de-morph extract <kind> [--input PATH] [--output PATH] [--limit N]
+//!   de-morph-build extract <kind> [--input PATH] [--output PATH] [--limit N]
 //!
 //! Kinds: nouns verbs adjectives adverbs particles abbreviations propn
 //!        pronouns compounds
@@ -30,16 +30,16 @@ use de_morph::analysis::{
     VerbForm,
 };
 use de_morph::paradigm::generate_closed_class_entries;
-use de_morph::wiktionary::abbreviation::extract_abbreviations;
-use de_morph::wiktionary::adjective::extract_adjectives;
-use de_morph::wiktionary::adverb::{extract_adverbs, extract_particles};
-use de_morph::wiktionary::compound::extract_compounds;
-use de_morph::wiktionary::dump::{Page, PageReader};
-use de_morph::wiktionary::noun::extract_nouns;
-use de_morph::wiktionary::pronoun::extract_pronouns;
-use de_morph::wiktionary::propn::extract_proper_nouns;
-use de_morph::wiktionary::verb::extract_verbs;
-use de_morph::wiktionary::ExtractedEntry;
+use crate::wiktionary::abbreviation::extract_abbreviations;
+use crate::wiktionary::adjective::extract_adjectives;
+use crate::wiktionary::adverb::{extract_adverbs, extract_particles};
+use crate::wiktionary::compound::extract_compounds;
+use crate::wiktionary::dump::{Page, PageReader};
+use crate::wiktionary::noun::extract_nouns;
+use crate::wiktionary::pronoun::extract_pronouns;
+use crate::wiktionary::propn::extract_proper_nouns;
+use crate::wiktionary::verb::extract_verbs;
+use crate::wiktionary::ExtractedEntry;
 
 const DEFAULT_INPUT: &str = "data/wiktionary/raw/dewiktionary-20260601-pages-articles.xml.bz2";
 const PROGRESS_EVERY: u64 = 50_000;
@@ -143,7 +143,7 @@ pub fn run(args: &[String]) -> Result<()> {
         i += 1;
     }
 
-    let kind = kind.context("missing <kind> (try `de-morph extract --help`)")?;
+    let kind = kind.context("missing <kind> (try `de-morph-build extract --help`)")?;
     let output = output
         .unwrap_or_else(|| PathBuf::from(format!("data/wiktionary/processed/{kind}.jsonl")));
 
@@ -289,10 +289,10 @@ fn covered_lemmas() -> HashSet<String> {
 
 fn print_usage() {
     eprintln!(
-        "de-morph extract — extract analyses from a Wiktionary dump\n\
+        "de-morph-build extract — extract analyses from a Wiktionary dump\n\
 \n\
 Usage:\n\
-  de-morph extract <kind> [options]   (requires --features extractor)\n\
+  de-morph-build extract <kind> [options]\n\
 \n\
 Kinds:\n\
   nouns verbs adjectives adverbs particles abbreviations propn pronouns compounds\n\

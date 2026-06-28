@@ -13,7 +13,7 @@ use std::path::Path;
 
 use fst::Map as FstMap;
 
-use crate::analysis::{Analysis, Aux, Case, Gender, Number, PackedFeatures, Source, UPOS};
+use crate::analysis::{Analysis, Aux, Case, Features, Gender, Number, PackedFeatures, Source, UPOS};
 use crate::lexicon::format::{
     bit_width, read_packed_u32, unpack_fst_value, AnalysisRecord, BitReader, Shape, HEADER_SIZE,
     MAGIC, SHAPE_ENTRY_SIZE, VERSION_MAJOR,
@@ -355,6 +355,37 @@ impl Lexicon {
     /// Number of unique lemmas.
     pub fn num_lemmas(&self) -> usize {
         self.num_lemmas
+    }
+
+    /// Write a canonical, order-independent dump of every surface's
+    /// analysis set: one line per surface, `surface\tA;A;A`, with the
+    /// analyses sorted. Each `A` is `lemma|POS|features|source`, where
+    /// features are rendered compactly (only set fields, `key=Val`, in a
+    /// fixed order). Diffing two dumps proves a format change preserved
+    /// every analysis of every surface; hashing one gives the lossless
+    /// fingerprint the build pipeline pins.
+    pub fn write_canonical_dump<W: std::io::Write>(&self, w: &mut W) -> std::io::Result<()> {
+        use fst::Streamer;
+        let mut stream = self.fst.stream();
+        while let Some((key, _)) = stream.next() {
+            let surface = String::from_utf8_lossy(key);
+            let mut items: Vec<String> = self
+                .analyze(&surface)
+                .iter()
+                .map(|a| {
+                    format!(
+                        "{}|{:?}|{}|{:?}",
+                        a.lemma,
+                        a.pos,
+                        fmt_features(&a.features),
+                        a.source
+                    )
+                })
+                .collect();
+            items.sort();
+            writeln!(w, "{}\t{}", surface, items.join(";"))?;
+        }
+        Ok(())
     }
 
     /// Return `true` if `surface` has at least one analysis in the FST.
@@ -819,6 +850,64 @@ fn lowercase_first(s: &str) -> String {
         Some(c) => c.to_lowercase().collect::<String>() + chars.as_str(),
         None => String::new(),
     }
+}
+
+/// Compact, canonical feature rendering for [`Lexicon::write_canonical_dump`]:
+/// only set fields, `key=Val`, space-separated, in a fixed order. Empty
+/// when no feature is set. Keys are kept (vs. bare values) so every
+/// distinct feature combination maps to a distinct string.
+fn fmt_features(f: &Features) -> String {
+    use std::fmt::Write as _;
+    let mut s = String::new();
+    let mut push = |k: &str, v: String| {
+        if !s.is_empty() {
+            s.push(' ');
+        }
+        let _ = write!(s, "{k}={v}");
+    };
+    if let Some(x) = f.case {
+        push("case", format!("{x:?}"));
+    }
+    if let Some(x) = f.number {
+        push("num", format!("{x:?}"));
+    }
+    if let Some(x) = f.gender {
+        push("gen", format!("{x:?}"));
+    }
+    if let Some(x) = f.person {
+        push("pers", format!("{x:?}"));
+    }
+    if let Some(x) = f.tense {
+        push("tense", format!("{x:?}"));
+    }
+    if let Some(x) = f.mood {
+        push("mood", format!("{x:?}"));
+    }
+    if let Some(x) = f.voice {
+        push("voice", format!("{x:?}"));
+    }
+    if let Some(x) = f.form {
+        push("form", format!("{x:?}"));
+    }
+    if let Some(x) = f.degree {
+        push("deg", format!("{x:?}"));
+    }
+    if let Some(x) = f.declension {
+        push("decl", format!("{x:?}"));
+    }
+    if let Some(x) = f.pron_type {
+        push("pron", format!("{x:?}"));
+    }
+    if let Some(x) = f.poss_person {
+        push("posspers", format!("{x:?}"));
+    }
+    if let Some(x) = f.poss_number {
+        push("possnum", format!("{x:?}"));
+    }
+    if let Some(x) = f.aux {
+        push("aux", format!("{x:?}"));
+    }
+    s
 }
 
 #[cfg(test)]

@@ -1,0 +1,27 @@
+# Build-time tooling for de-morph: Wiktionary extraction + lexicon build +
+# the reproducible pipeline and CC BY-SA packaging. Kept as a separate
+# binary crate so the published `de-morph` library's dependency tree stays
+# minimal (just `fst`); none of the bz2/XML/serde machinery here leaks into
+# downstream consumers of the library.
+[package]
+name = "de-morph-build"
+version = "0.0.1"
+edition = "2021"
+rust-version = "1.74"
+description = "Build-time lexicon tooling for de-morph (Wiktionary extraction + FST build)"
+license = "MIT"
+publish = false
+
+[[bin]]
+name = "de-morph-build"
+path = "src/main.rs"
+
+[dependencies]
+de-morph-rs = { path = "..", version = "0.0.1" }
+fst = "0.4"
+anyhow = "1"
+bzip2 = "0.4"
+quick-xml = "0.36"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"

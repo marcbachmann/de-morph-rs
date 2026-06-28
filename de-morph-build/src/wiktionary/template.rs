@@ -43,7 +43,9 @@ impl<'a> Template<'a> {
     }
 
     /// Return the n-th positional argument (1-based, matching MediaWiki
-    /// convention).
+    /// convention). Part of the template-parsing API; not used by the
+    /// current extractors (named args cover every template they read).
+    #[allow(dead_code)]
     pub fn positional_arg(&self, n: usize) -> Option<&'a str> {
         if n == 0 {
             return None;

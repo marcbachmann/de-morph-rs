@@ -46,33 +46,33 @@ Usage tiers (see `data/README.md`):
   derivative of the snapshot, so it inherits CC BY-SA 4.0. It is **not**
   part of the MIT cargo crate (`data/*` is excluded in `Cargo.toml`); it
   is distributed separately, bundled with its licence and attribution by
-  `scripts/build/package-data.sh`. The MIT-licensed Rust source contains
-  no Wiktionary-derived text.
+  `de-morph-build package`. The MIT-licensed Rust source contains no
+  Wiktionary-derived text.
 - intermediate `processed/*.jsonl` — `build-only` (regenerable;
   gitignored). Same CC BY-SA status as the lexicon if ever shipped.
 
 ## Extraction scope (implemented)
 
 `(lemma, pos, features, source)` records are extracted from German
-Wiktionary's standard template families by the `extract-*` binaries
-(`src/bin/`, feature `extractor`):
+Wiktionary's standard template families by `de-morph-build extract
+<kind>` (the `de-morph-build` workspace crate):
 
-- `{{Deutsch Substantiv Übersicht}}` → `extract-nouns`
-- conjugation tables → `extract-verbs`
-- `{{Deutsch Adjektiv Übersicht}}` → `extract-adjectives`
+- `{{Deutsch Substantiv Übersicht}}` → `extract nouns`
+- conjugation tables → `extract verbs`
+- `{{Deutsch Adjektiv Übersicht}}` → `extract adjectives`
 - `{{Pronomina-Tabelle}}` / `{{Deutsch Pronomen Übersicht}}` + indeclinable
-  indefinites → `extract-pronouns` (demonstratives, relatives, and the
+  indefinites → `extract pronouns` (demonstratives, relatives, and the
   open-ended indefinite/determiner gap: `allerlei` and the `-lei` family,
   `derjenige`, `irgendein`, `jeglicher`, …)
-- adverbs / particles / abbreviations / proper nouns → respective bins
-- compound surfaces → `extract-compounds` (built for the runtime
+- adverbs / particles / abbreviations / proper nouns → `extract <kind>`
+- compound surfaces → `extract compounds` (built for the runtime
   splitter; not baked into the FST)
 
 The core closed class (personal pronouns, articles, prepositions,
 conjunctions, numerals, punctuation) comes from the hand-curated table in
 `src/paradigm/closed_class.rs`, because the personal-pronoun and possessive
 paradigms use parameterless meta-templates whose forms are absent from the
-page wikitext. `extract-pronouns` skips every lemma that table already
+page wikitext. `extract pronouns` skips every lemma that table already
 covers, so the two sources never collide — extraction only *adds* the
 open-ended pronoun/determiner items the hand-curated set omits.
 
@@ -84,16 +84,16 @@ mechanically available.
 
 The lexicon is deterministic given this snapshot:
 
-    bash scripts/fetch/dewiktionary.sh     # fetch + verify (sha256 above)
-    bash scripts/build/lexicon.sh          # extract → build → verify
-    bash scripts/build/package-data.sh     # CC BY-SA bundle for shipping
+    bash scripts/fetch/dewiktionary.sh                  # fetch + verify (sha256 above)
+    cargo run -p de-morph-build --release -- all        # extract → build → verify
+    cargo run -p de-morph-build --release -- package    # CC BY-SA bundle for shipping
 
-`scripts/build/lexicon.sh` reproduces `data/lexicon/lexicon.{fst,dat}`
+`de-morph-build all` reproduces `data/lexicon/lexicon.{fst,dat}`
 byte-for-byte and asserts the lossless analysis fingerprint:
 
-- surfaces: 711,765
+- surfaces: 711,398
 - analysis-dump sha256:
-  `268247e02f36ec28027080076089e25d289c02f2a356757917258f5db09f4dc5`
+  `391c4931061a2ed8e9349b840b699d7080a743f2748fdc9655d959b94ede60d6`
 
 ## Files in this directory
 
@@ -111,5 +111,5 @@ different snapshot:
 
     DUMP_DATE=20260620 bash scripts/fetch/dewiktionary.sh
 
-Then re-run `scripts/build/lexicon.sh`; if the snapshot changed, update
-the hashes above (raw sha256 and the lossless fingerprint).
+Then re-run `de-morph-build all`; if the snapshot changed, update the
+hashes above (raw sha256 and the lossless fingerprint).

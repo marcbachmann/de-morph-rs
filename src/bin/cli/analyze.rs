@@ -98,9 +98,9 @@ pub fn run(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
         Mode::Showcase
     };
 
-    eprintln!("Loading embedded lexicon (zero-copy)...");
+    eprintln!("Loading lexicon...");
     let load_start = Instant::now();
-    let mut analyzer = crate::loader::analyzer()?;
+    let mut analyzer = crate::loader::analyzer_or_empty();
     if swiss {
         analyzer = analyzer.with_swiss_orthography(true);
     }

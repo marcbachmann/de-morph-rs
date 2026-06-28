@@ -1,16 +1,16 @@
 //! `de-morph bench` — throughput + memory benchmark for the runtime analyzer.
 //!
-//! Loads the embedded lexicon (zero-copy `from_static`), collects every
-//! surface form, then times `Lexicon::analyze` over all of them across
-//! several passes. Run under `/usr/bin/time -l` to capture max RSS:
+//! Loads the lexicon from disk, collects every surface form, then times
+//! `Lexicon::analyze` over all of them across several passes. Run under
+//! `/usr/bin/time -l` to capture max RSS:
 //!
 //!   cargo build --release --bin de-morph
 //!   /usr/bin/time -l ./target/release/de-morph bench 5
 //!
 //! Modes (arg 1):
 //!   sweep [passes]   throughput over every surface (default, passes=5)
-//!   load             from_static load only — dat stays demand-paged
-//!   loadbytes        from_bytes load only — dat copied into the heap
+//!   load             read from disk + `from_static` (leaked) load only
+//!   loadbytes        read from disk + `from_bytes` load only
 //! Combine with `/usr/bin/time -l` to read max RSS per mode.
 
 use std::time::Instant;
@@ -18,20 +18,20 @@ use std::time::Instant;
 use de_morph::Lexicon;
 use fst::{Map as FstMap, Streamer};
 
-use crate::loader::{LEXICON_DAT, LEXICON_FST};
-
 pub fn run(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
     let mode = args.first().cloned().unwrap_or_else(|| "sweep".into());
 
-    // Load-only modes isolate the lexicon's resident footprint (no word
-    // list, no analysis churn) — `from_static` leaves the side table
-    // demand-paged in the binary image, `from_bytes` copies it to the heap.
+    // The lexicon is read from disk (the binary embeds nothing). The two
+    // load modes still contrast the constructors: `from_bytes` owns the
+    // heap Vec; `from_static` borrows it (here via a leaked Box, since the
+    // bytes come from a file rather than the binary image).
     if mode == "load" || mode == "loadbytes" {
+        let (fst, dat) = crate::loader::read_bytes()?;
         let t = Instant::now();
         let lex = if mode == "loadbytes" {
-            Lexicon::from_bytes(LEXICON_FST.to_vec(), LEXICON_DAT.to_vec())?
+            Lexicon::from_bytes(fst, dat)?
         } else {
-            Lexicon::from_static(LEXICON_FST, LEXICON_DAT)?
+            Lexicon::from_static(Box::leak(fst.into_boxed_slice()), Box::leak(dat.into_boxed_slice()))?
         };
         // Touch one lookup so the structure is real, not optimized away.
         let n = lex.analyze("Tisch").len();
@@ -45,12 +45,14 @@ pub fn run(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
 
     let passes: u32 = args.get(1).and_then(|s| s.parse().ok()).unwrap_or(5);
 
+    let (fst_bytes, dat_bytes) = crate::loader::read_bytes()?;
+    let (fst_len, dat_len) = (fst_bytes.len(), dat_bytes.len());
     let t_load = Instant::now();
-    let lex = Lexicon::from_static(LEXICON_FST, LEXICON_DAT)?;
+    let lex = Lexicon::from_bytes(fst_bytes.clone(), dat_bytes)?;
     let load_us = t_load.elapsed().as_micros();
 
     // Collect every surface form once.
-    let map = FstMap::new(LEXICON_FST)?;
+    let map = FstMap::new(fst_bytes)?;
     let mut words: Vec<String> = Vec::with_capacity(lex.num_surfaces() as usize);
     let mut stream = map.stream();
     while let Some((key, _)) = stream.next() {
@@ -80,7 +82,7 @@ pub fn run(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
 
     let calls = words.len() as u64 * passes as u64;
     let secs = elapsed.as_secs_f64();
-    println!("lexicon: from_static  fst={} B  dat={} B", LEXICON_FST.len(), LEXICON_DAT.len());
+    println!("lexicon: from_bytes  fst={fst_len} B  dat={dat_len} B");
     println!("load: {:.2} ms", load_us as f64 / 1000.0);
     println!("surfaces: {}   passes: {}   checksum: {}", words.len(), passes, checksum);
     println!(

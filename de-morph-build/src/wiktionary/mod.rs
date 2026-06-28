@@ -27,10 +27,7 @@ pub mod propn;
 pub mod template;
 pub mod verb;
 
-pub use dump::{Page, PageReader};
-pub use template::{find_templates, parse_template_body, Template};
-
-use crate::analysis::{Features, Source, UPOS};
+use de_morph::analysis::{Features, Source, UPOS};
 
 /// Whether a template form cell holds a usable surface form.
 ///

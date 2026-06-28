@@ -10,7 +10,10 @@ to a known location, verifies the sha256 recorded in the source's
     scripts/
         fetch/                  one script per upstream source
             <source-id>.sh
-        build/                  data processing pipelines
+
+The data-processing pipeline (extract → build → verify → package) is no
+longer a shell script — it lives in the `de-morph-build` binary; run
+`cargo run -p de-morph-build --release -- all` (then `... -- package`).
 
 ## Conventions
 
@@ -34,9 +37,7 @@ See `CONTRIBUTING.md` at the project root, step 6.
 
 - `fetch/dewiktionary.sh` — fetch + sha256-verify the pinned German
   Wiktionary snapshot into `data/wiktionary/raw/`.
-- `build/lexicon.sh` — extract → build → verify the runtime lexicon
-  (`data/lexicon/lexicon.{fst,dat}`); deterministic, asserts the
-  lossless analysis fingerprint.
-- `build/package-data.sh` — bundle the built lexicon as a standalone
-  CC BY-SA 4.0 distributable (artifact + LICENSE + ATTRIBUTION +
-  PROVENANCE + checksums) for shipping separately from the MIT crate.
+
+The build + packaging steps formerly here (`build/lexicon.sh`,
+`build/package-data.sh`) are now `de-morph-build all` and
+`de-morph-build package`.

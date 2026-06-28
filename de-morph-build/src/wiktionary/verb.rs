@@ -19,8 +19,8 @@
 //! - Parameter inventory verified against three real entries
 //!   (`lieben`, `sein`, `klieben`) sampled from the 20260601 dump.
 
-use crate::analysis::{Aux, UPOS};
-use crate::paradigm::verb::{generate_verb_paradigm, VerbAttested};
+use de_morph::analysis::{Aux, UPOS};
+use de_morph::paradigm::verb::{generate_verb_paradigm, VerbAttested};
 use crate::wiktionary::template::{find_templates, Template};
 use crate::wiktionary::ExtractedEntry;
 
@@ -104,7 +104,7 @@ fn non_empty(value: Option<&str>) -> Option<&str> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::analysis::{Aux, Mood, Number, Person, Source, Tense, VerbForm};
+    use de_morph::analysis::{Aux, Mood, Number, Person, Source, Tense, VerbForm};
 
     fn page(body: &str) -> String {
         format!("== Headword ({{{{Sprache|Deutsch}}}}) ==\n{{{{{body}}}}}\n")

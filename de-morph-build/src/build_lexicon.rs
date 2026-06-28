@@ -456,10 +456,10 @@ fn parse_args(args: &[String]) -> Result<Args> {
 
 fn print_usage() {
     eprintln!(
-        "de-morph build-lexicon — build the runtime FST + side table from JSONL inputs\n\
+        "de-morph-build build — build the runtime FST + side table from JSONL inputs\n\
 \n\
 Usage:\n\
-  de-morph build-lexicon [options]   (requires --features extractor)\n\
+  de-morph-build build [options]\n\
 \n\
 Options:\n\
   --input <PATH>      Add an input JSONL file (default: nouns.jsonl + verbs.jsonl).\n\

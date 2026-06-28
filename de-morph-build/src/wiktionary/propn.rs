@@ -32,7 +32,7 @@
 //! - Wiktionary Wortart inventory: <https://de.wiktionary.org/wiki/Vorlage:Wortart>
 //! - UD PROPN definition: <https://universaldependencies.org/u/pos/PROPN.html>
 
-use crate::analysis::{Case, Features, Gender, Number, Source, UPOS};
+use de_morph::analysis::{Case, Features, Gender, Number, Source, UPOS};
 use crate::wiktionary::template::{find_templates, Template};
 use crate::wiktionary::ExtractedEntry;
 

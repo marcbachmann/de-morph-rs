@@ -11,8 +11,8 @@
 //!   (`pittoresk`, `infinitesimal`, `lieb`, `rot`) sampled from the
 //!   20260601 dump.
 
-use crate::analysis::UPOS;
-use crate::paradigm::adjective::{generate_adjective_paradigm, AdjectiveAttested};
+use de_morph::analysis::UPOS;
+use de_morph::paradigm::adjective::{generate_adjective_paradigm, AdjectiveAttested};
 use crate::wiktionary::template::{find_templates, Template};
 use crate::wiktionary::ExtractedEntry;
 
@@ -73,7 +73,7 @@ fn is_strictly_indeclinable(tpl: &Template<'_>) -> bool {
 /// adjective: the bare lemma, predicative-only positive degree, no
 /// case/number/gender feature.
 fn strictly_indeclinable_entry(title: &str) -> ExtractedEntry {
-    use crate::analysis::{Degree, Features, Source};
+    use de_morph::analysis::{Degree, Features, Source};
     ExtractedEntry {
         surface: title.to_string(),
         lemma: title.to_string(),
@@ -144,7 +144,7 @@ fn non_empty(value: Option<&str>) -> Option<&str> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::analysis::{Case, Declension, Degree, Gender, Number, Source};
+    use de_morph::analysis::{Case, Declension, Degree, Gender, Number, Source};
 
     fn page(body: &str) -> String {
         format!("== Headword ({{{{Sprache|Deutsch}}}}) ==\n{{{{{body}}}}}\n")

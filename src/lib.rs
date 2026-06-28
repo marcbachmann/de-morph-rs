@@ -19,9 +19,6 @@ pub mod analyzer;
 pub mod lexicon;
 pub mod paradigm;
 
-#[cfg(feature = "extractor")]
-pub mod wiktionary;
-
 pub use analysis::{Analysis, Features, Source, UPOS};
 pub use analyzer::Analyzer;
 pub use lexicon::{Lexicon, LexiconBuilder};

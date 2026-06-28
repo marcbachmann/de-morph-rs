@@ -29,7 +29,7 @@
 //! - Wiktionary template: <https://de.wiktionary.org/wiki/Vorlage:Wortart>
 //! - UD POS inventory: <https://universaldependencies.org/u/pos/>
 
-use crate::analysis::{Features, Source, UPOS};
+use de_morph::analysis::{Features, Source, UPOS};
 use crate::wiktionary::ExtractedEntry;
 
 /// Hand-curated table: abbreviation → syntactic POS of its full form.

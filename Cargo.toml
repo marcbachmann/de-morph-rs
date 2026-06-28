@@ -18,32 +18,19 @@ exclude = ["data/*", "scripts/*"]
 [lib]
 name = "de_morph"
 
-[features]
-default = []
-# Build-time tooling: streaming bz2/XML reader, MediaWiki template parser,
-# and the extract-* binaries. Not needed at runtime — the published crate
-# default keeps the dependency tree minimal.
-extractor = [
-    "dep:anyhow",
-    "dep:bzip2",
-    "dep:quick-xml",
-    "dep:serde",
-    "dep:serde_json",
-]
+# Build-time tooling (Wiktionary extraction + lexicon build + packaging)
+# lives in the de-morph-build member crate so its bz2/XML/serde deps never
+# enter this published library's dependency tree.
+[workspace]
+members = ["de-morph-build"]
 
 [dependencies]
 fst = "0.4"
-anyhow = { version = "1", optional = true }
-bzip2 = { version = "0.4", optional = true }
-quick-xml = { version = "0.36", optional = true }
-serde = { version = "1", features = ["derive"], optional = true }
-serde_json = { version = "1", optional = true }
 
-# The single `de-morph` binary. Runtime subcommands (analyze / split /
-# bench / dump + eval diagnostics) embed the lexicon via include_bytes!
-# and need no extra deps. The lexicon-build subcommands (extract /
-# build-lexicon) are compiled in only under `--features extractor`, which
-# pulls the bz2/XML/serde tooling.
+# The `de-morph` runtime binary: analyze / split / bench / dump + eval
+# diagnostics. It loads the lexicon from disk at runtime (it embeds
+# nothing — keeping this MIT binary free of CC BY-SA Wiktionary bytes) and
+# needs no dependency beyond the library's `fst`.
 [[bin]]
 name = "de-morph"
 path = "src/bin/de-morph.rs"

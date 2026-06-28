@@ -65,19 +65,32 @@ tag set and the morphological feature inventory.
 The published crate bundles no data (`data/` is excluded from the
 package — see `exclude` in `Cargo.toml`). With no lexicon loaded the
 analyzer still returns best-effort out-of-vocabulary guesses; for real
-coverage, build a lexicon and open it with `Analyzer::open`. The
-`de-morph build-lexicon` subcommand (built with `--features extractor`)
-writes a Wiktionary-derived lexicon to `data/lexicon/` (generated;
-gitignored) for local development and evaluation. The full reproducible
-pipeline — extract every POS then build — is `scripts/build/lexicon.sh`.
+coverage, build a lexicon and open it with `Analyzer::open`.
 
 ## CLI
 
-A single `de-morph` binary. Runtime subcommands (`analyze`, `split`,
-`bench`, `dump`, `eval`, `eval-split`, `dump-unmatched`) embed the
-lexicon and need no extra features. The lexicon-build subcommands
-(`extract <kind>`, `build-lexicon`) require `--features extractor`. Run
-`de-morph --help` for the full list.
+Two binaries, split so the published library stays MIT-clean and
+dependency-light:
+
+- **`de-morph`** (this crate) — the runtime: `analyze`, `split`, `bench`,
+  `dump`, `eval`, `eval-split`, `dump-unmatched`. It loads the lexicon
+  from `data/lexicon/` at runtime (override with `DE_MORPH_LEXICON_DIR`)
+  and **embeds nothing**, so the MIT binary carries no CC BY-SA
+  Wiktionary-derived bytes. Depends only on `fst`.
+
+- **`de-morph-build`** (the `de-morph-build/` workspace crate) — the
+  build pipeline: `extract <kind>`, `build`, `all`, `package`. `all` runs
+  the whole reproducible flow (verify the pinned dump → extract every POS
+  → build the FST → verify the lossless fingerprint); `package` stages the
+  CC BY-SA 4.0 data bundle. The bz2/XML/serde dependencies live only here.
+
+Typical flow:
+
+    bash scripts/fetch/dewiktionary.sh   # fetch + verify the dump
+    cargo run -p de-morph-build --release -- all
+    cargo run --release -- analyze "Ich gehe zur Schule."
+
+Run `de-morph --help` / `de-morph-build --help` for the full list.
 
 ## Contributing
 
